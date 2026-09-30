@@ -28,6 +28,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { PassFailBadge } from "@/components/ui/StatusBadge";
 import TrendChart, { type TrendPoint } from "./TrendChart";
 import DashboardPlanCard from "@/components/training/DashboardPlanCard";
+import DashboardProfileCard from "@/components/profile/DashboardProfileCard";
 import { TRAINING_PLANS_ENABLED } from "@/lib/features";
 
 type Mode = "points" | "raw";
@@ -154,6 +155,8 @@ export default function Dashboard() {
           </>
         }
       />
+
+      <DashboardProfileCard latestTotal={latestResult.total} />
 
       {TRAINING_PLANS_ENABLED && <DashboardPlanCard latestResultId={latest.record.id} />}
 
@@ -400,6 +403,7 @@ function DashboardEmpty() {
   return (
     <div className="space-y-6">
       <PageHeader title="Dashboard" />
+      <DashboardProfileCard />
       <Card className="mx-auto max-w-2xl text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
           <ClipboardPlus className="h-6 w-6" aria-hidden />

@@ -1,19 +1,11 @@
 import type { Metadata } from "next";
-import { Card, PageHeader } from "@/components/ui/Card";
-import { ButtonLink } from "@/components/ui/Button";
+import ProfileEditor from "@/components/profile/ProfileEditor";
 
-export const metadata: Metadata = { title: "Profile" };
+export const metadata: Metadata = {
+  title: "Profile",
+  description: "Your Soldier profile: scoring details and training preferences, stored only in this browser.",
+};
 
 export default function ProfilePage() {
-  return (
-    <div>
-      <PageHeader title="Profile" />
-      <Card>
-        <p className="text-sm text-ink-2">Soldier profile features are currently in development.</p>
-        <ButtonLink href="/dashboard" variant="secondary" className="mt-4">
-          Back to dashboard
-        </ButtonLink>
-      </Card>
-    </div>
-  );
+  return <ProfileEditor />;
 }

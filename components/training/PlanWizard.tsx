@@ -8,15 +8,14 @@ import { aftStandardRules } from "@/lib/aft/rules";
 import { describeCategory, formatTestDate } from "@/lib/aft/format";
 import { categoryOf, sortByTestDate } from "@/lib/aft/progress";
 import { useAftResults, useHydrated } from "@/lib/storage/aftResults";
+import { useProfile } from "@/lib/storage/profile";
+import { planPrefill } from "@/lib/profile/profile";
 import { activePlan, startPlan, updateTrainingData, useTrainingData } from "@/lib/storage/trainingPlans";
 import { WEEKDAYS, generatePlan, weekdayLabels } from "@/lib/training/engine";
 import type {
   DaysPerWeek,
-  EquipmentOption,
-  Experience,
   PlanOutcome,
   PreferenceAnswers,
-  Restriction,
   RunningVolume,
   Screening,
   SessionMinutes,
@@ -27,38 +26,12 @@ import { ButtonLink, buttonClass } from "@/components/ui/Button";
 import { PassFailBadge } from "@/components/ui/StatusBadge";
 import { PlanDisclaimer, useToday } from "./PlanParts";
 import PlanPreview from "./PlanPreview";
+import { equipmentOptions, experienceOptions, restrictionOptions, runningOptions } from "@/lib/training/options";
 
 type Step = "baseline" | "screening" | "preferences" | "review";
 
 const inputClass =
   "mt-1.5 w-full rounded-lg border border-line-strong bg-canvas px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none";
-
-const experienceOptions: { value: Experience; label: string; hint: string }[] = [
-  { value: "new", label: "New or returning", hint: "Little or no structured training in the last 3 months" },
-  { value: "some", label: "Some", hint: "Training 1–2 times a week" },
-  { value: "regular", label: "Regular", hint: "Training 3 or more times a week for 3+ months" },
-];
-
-const runningOptions: { value: RunningVolume; label: string }[] = [
-  { value: "none", label: "None" },
-  { value: "up-to-30", label: "Up to 30 minutes a week" },
-  { value: "31-60", label: "31–60 minutes a week" },
-  { value: "61-120", label: "61–120 minutes a week" },
-  { value: "over-120", label: "More than 120 minutes a week" },
-];
-
-const equipmentOptions: { value: EquipmentOption; label: string }[] = [
-  { value: "kettlebell", label: "Kettlebells" },
-  { value: "dumbbell", label: "Dumbbells" },
-  { value: "barbell-or-hex-bar", label: "Barbell or hex bar with plates" },
-];
-
-const restrictionOptions: { value: Restriction; label: string }[] = [
-  { value: "no-running", label: "Running" },
-  { value: "no-jumping", label: "Jumping or bounding" },
-  { value: "no-loaded-lifting", label: "Lifting weights" },
-  { value: "no-weight-on-hands", label: "Putting weight on my hands (push-ups, hands-and-knees positions)" },
-];
 
 // Answers the AFT score cannot establish start unanswered so the user has to choose them.
 const initialPrefs: PreferenceAnswers = {
@@ -76,6 +49,7 @@ export default function PlanWizard() {
   const hydrated = useHydrated();
   const results = useAftResults();
   const training = useTrainingData();
+  const profile = useProfile();
   const today = useToday();
   const router = useRouter();
   const params = useSearchParams();
@@ -85,9 +59,11 @@ export default function PlanWizard() {
   const [step, setStep] = useState<Step>("baseline");
   const [baselineId, setBaselineId] = useState<string | null>(null);
   const [screening, setScreening] = useState<Screening>({ currentPain: null, otherInstructions: "" });
-  const [prefs, setPrefs] = useState<PreferenceAnswers>(initialPrefs);
-  const [aftDate, setAftDate] = useState("");
-  const [target, setTarget] = useState("");
+  // Null until the user changes something; until then the answers come from the profile.
+  const [editedPrefs, setPrefs] = useState<PreferenceAnswers | null>(null);
+  const [editedAftDate, setAftDate] = useState<string | null>(null);
+  const [editedTarget, setTarget] = useState<string | null>(null);
+  const [prefsConfirmed, setPrefsConfirmed] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -105,6 +81,12 @@ export default function PlanWizard() {
     );
   }
 
+  const prefill = planPrefill(profile);
+  const prefs: PreferenceAnswers = editedPrefs ?? { ...initialPrefs, ...prefill.answers };
+  const aftDate = editedAftDate ?? prefill.nextAftDate ?? "";
+  const target = editedTarget ?? (prefill.targetScore !== undefined ? String(prefill.targetScore) : "");
+  const needsConfirmation = prefill.fields > 0 && !prefsConfirmed;
+
   const selectedId = baselineId ?? (saved.some((r) => r.id === requested) ? requested! : saved[0].id);
   const selected = saved.find((r) => r.id === selectedId) ?? saved[0];
   const start = startDate || today;
@@ -121,7 +103,7 @@ export default function PlanWizard() {
   });
   const existing = activePlan(training);
 
-  const set = <K extends keyof PreferenceAnswers>(key: K, value: PreferenceAnswers[K]) => setPrefs((p) => ({ ...p, [key]: value }));
+  const set = <K extends keyof PreferenceAnswers>(key: K, value: PreferenceAnswers[K]) => setPrefs((p) => ({ ...(p ?? prefs), [key]: value }));
   const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
   const handleStart = () => {
@@ -233,6 +215,15 @@ export default function PlanWizard() {
 
       {step === "preferences" && (
         <Card title="Preferences" description="Only what the plan needs.">
+          {prefill.fields > 0 && (
+            <p className="mb-4 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-ink">
+              {prefill.fields} {prefill.fields === 1 ? "answer was" : "answers were"} prefilled from your{" "}
+              <Link href="/profile" className="underline">
+                profile
+              </Link>
+              . Check each one before continuing. Changes here apply to this plan only and don&apos;t change your profile.
+            </p>
+          )}
           <div className="grid gap-5 md:grid-cols-2">
             <label className="block text-sm">
               <span className="text-ink-2">Training days per week</span>
@@ -373,7 +364,13 @@ export default function PlanWizard() {
               <input inputMode="numeric" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="e.g. 400" className={inputClass} />
             </label>
           </div>
-          <StepButtons back={back} next={() => setStep("review")} nextLabel="Review suggested plan" />
+          {prefill.fields > 0 && (
+            <label className="mt-5 flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={prefsConfirmed} onChange={() => setPrefsConfirmed(!prefsConfirmed)} className="mt-1 accent-[var(--color-accent)]" />
+              I&apos;ve checked these preferences and they are current.
+            </label>
+          )}
+          <StepButtons back={back} next={() => setStep("review")} nextLabel="Review suggested plan" disabled={needsConfirmation} />
         </Card>
       )}
 

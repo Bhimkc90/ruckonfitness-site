@@ -22,15 +22,13 @@ const primaryItems = [
   { name: "AFT Guide", icon: ClipboardList, href: "/aft-guide" },
   { name: "History", icon: History, href: "/score-history" },
   { name: "Library", icon: BookOpen, href: "/workouts" },
-  ...(TRAINING_PLANS_ENABLED ? [{ name: "Training plans", icon: Dumbbell, href: "/training-plan" }] : []),
+  // Personalized plans stay behind the release flag; until then the page shows labeled preview examples.
+  { name: "Training plans", icon: Dumbbell, href: "/training-plan", badge: TRAINING_PLANS_ENABLED ? undefined : "Preview" },
+  { name: "Profile", icon: User, href: "/profile" },
 ];
 
-// Placeholder pages that exist but have no features yet (training plans until the release flag is on).
-const comingSoonItems = [
-  ...(TRAINING_PLANS_ENABLED ? [] : [{ name: "Training plans", icon: Dumbbell, href: "/training-plan" }]),
-  { name: "Profile", icon: User, href: "/profile" },
-  { name: "Settings", icon: Settings, href: "/settings" },
-];
+// Placeholder pages that exist but have no features yet.
+const comingSoonItems = [{ name: "Settings", icon: Settings, href: "/settings" }];
 
 function Brand() {
   return (
@@ -48,7 +46,7 @@ function NavLink({
   active,
   muted = false,
 }: {
-  item: (typeof primaryItems)[number];
+  item: { name: string; icon: typeof User; href: string; badge?: string };
   active: boolean;
   muted?: boolean;
 }) {
@@ -67,10 +65,17 @@ function NavLink({
     >
       <Icon className={`h-4 w-4 ${active ? "text-accent" : ""}`} aria-hidden />
       {item.name}
-      {muted && (
+      {muted ? (
         <span className="ml-auto rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-2">
           Soon
         </span>
+      ) : (
+        "badge" in item &&
+        item.badge && (
+          <span className="ml-auto rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+            {item.badge}
+          </span>
+        )
       )}
     </Link>
   );

@@ -14,6 +14,9 @@ import {
   type AftFormValues,
 } from "@/lib/aft/validation";
 import { saveAftResult } from "@/lib/storage/aftResults";
+import { useProfile } from "@/lib/storage/profile";
+import { applyCalculatorDefaults, calculatorDefaults, type CalculatorProfileField } from "@/lib/profile/profile";
+import { useToday } from "@/components/training/PlanParts";
 import { Card } from "@/components/ui/Card";
 import { ButtonLink, buttonClass } from "@/components/ui/Button";
 import AftResultSummary from "./AftResultSummary";
@@ -29,9 +32,17 @@ const inputClass =
   "mt-1.5 w-full rounded-lg border border-line-strong bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-2/60 focus:border-accent focus:outline-none";
 
 export default function AftCalculator() {
-  const [values, setValues] = useState<AftFormValues>(emptyAftForm);
+  const profile = useProfile();
+  const today = useToday();
+  const [entered, setValues] = useState<AftFormValues>(emptyAftForm);
+  // Soldier details the user has typed for this test. Untouched ones come from the profile.
+  const [overridden, setOverridden] = useState<CalculatorProfileField[]>([]);
   const [saveErrors, setSaveErrors] = useState<Partial<Record<AftFormField, string>>>({});
   const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
+
+  const defaults = calculatorDefaults(profile, entered.testDate || today || "");
+  const { values, fromProfile } = applyCalculatorDefaults(entered, defaults, overridden);
+  const prefilled = (field: CalculatorProfileField) => fromProfile.includes(field);
 
   const validation = validateAftForm(values);
   const result = validation.ok ? scoreAft(validation.input) : null;
@@ -39,6 +50,9 @@ export default function AftCalculator() {
 
   const update = (field: keyof AftFormValues, value: string) => {
     setValues((current) => ({ ...current, [field]: value }));
+    if ((field === "age" || field === "standard" || field === "gender") && !overridden.includes(field)) {
+      setOverridden([...overridden, field]);
+    }
     setSaveErrors({});
     setStatus({ kind: "idle" });
   };
@@ -69,6 +83,7 @@ export default function AftCalculator() {
 
   const reset = () => {
     setValues(emptyAftForm);
+    setOverridden([]);
     setSaveErrors({});
     setStatus({ kind: "idle" });
   };
@@ -78,7 +93,7 @@ export default function AftCalculator() {
       <form className="space-y-6" onSubmit={(event) => event.preventDefault()} noValidate>
         <Card title="Soldier details" description="Used to choose the score table.">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Field label="Age on test date" error={errorFor("age", "age")}>
+            <Field label="Age on test date" hint={prefilled("age") ? "From your profile's date of birth" : undefined} error={errorFor("age", "age")}>
               <input
                 inputMode="numeric"
                 autoComplete="off"
@@ -89,7 +104,7 @@ export default function AftCalculator() {
               />
             </Field>
 
-            <Field label="Standard" error={errors.standard}>
+            <Field label="Standard" hint={prefilled("standard") ? "From your profile" : undefined} error={errors.standard}>
               <select
                 value={values.standard}
                 onChange={(e) => update("standard", e.target.value as AftStandard)}
@@ -101,7 +116,7 @@ export default function AftCalculator() {
             </Field>
 
             {values.standard === "general" ? (
-              <Field label="Sex (score table)" error={errorFor("gender", "gender")}>
+              <Field label="Sex (score table)" hint={prefilled("gender") ? "From your profile" : undefined} error={errorFor("gender", "gender")}>
                 <select
                   value={values.gender}
                   onChange={(e) => update("gender", e.target.value)}
@@ -130,6 +145,25 @@ export default function AftCalculator() {
           </div>
           <p className="mt-3 text-xs text-ink-2">
             {aftStandardRules[values.standard].label}: {aftStandardRules[values.standard].description}
+          </p>
+          <p className="mt-2 text-xs text-ink-2">
+            {Object.keys(defaults).length > 0 ? (
+              <>
+                Details marked &ldquo;From your profile&rdquo; are prefilled. Changing them applies to this test only; your{" "}
+                <Link href="/profile" className="text-accent underline">
+                  profile
+                </Link>{" "}
+                isn&apos;t changed.
+              </>
+            ) : (
+              <>
+                Save your date of birth and standard in your{" "}
+                <Link href="/profile" className="text-accent underline">
+                  profile
+                </Link>{" "}
+                to fill these in automatically.
+              </>
+            )}
           </p>
         </Card>
 
