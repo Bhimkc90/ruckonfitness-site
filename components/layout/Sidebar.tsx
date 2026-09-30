@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Activity,
   Backpack,
+  BookOpen,
   ClipboardPlus,
   Dumbbell,
   History,
@@ -17,12 +18,12 @@ const primaryItems = [
   { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { name: "Record AFT", icon: ClipboardPlus, href: "/aft-calculator" },
   { name: "History", icon: History, href: "/score-history" },
+  { name: "Library", icon: BookOpen, href: "/workouts" },
 ];
 
 // Placeholder pages that exist but have no features yet.
 const comingSoonItems = [
   { name: "Training plan", icon: Dumbbell, href: "/training-plan" },
-  { name: "Workouts", icon: Activity, href: "/workouts" },
   { name: "Profile", icon: User, href: "/profile" },
   { name: "Settings", icon: Settings, href: "/settings" },
 ];
@@ -73,6 +74,13 @@ function NavLink({
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const mobileNav = useRef<HTMLElement>(null);
+
+  // Keep the current page visible in the horizontally scrolling mobile nav.
+  useEffect(() => {
+    mobileNav.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [pathname]);
 
   return (
     <>
@@ -81,12 +89,12 @@ export default function Sidebar() {
         <div className="px-4 pt-3">
           <Brand />
         </div>
-        <nav aria-label="Main" className="flex gap-1 overflow-x-auto px-3 py-2">
+        <nav ref={mobileNav} aria-label="Main" className="flex gap-1 overflow-x-auto px-3 py-2">
           {primaryItems.map((item) => (
-            <NavLink key={item.href} item={item} active={pathname === item.href} />
+            <NavLink key={item.href} item={item} active={isActive(item.href)} />
           ))}
           {comingSoonItems.map((item) => (
-            <NavLink key={item.href} item={item} active={pathname === item.href} muted />
+            <NavLink key={item.href} item={item} active={isActive(item.href)} muted />
           ))}
         </nav>
       </header>
@@ -98,11 +106,11 @@ export default function Sidebar() {
         </div>
         <nav aria-label="Main" className="mt-8 flex flex-col gap-1">
           {primaryItems.map((item) => (
-            <NavLink key={item.href} item={item} active={pathname === item.href} />
+            <NavLink key={item.href} item={item} active={isActive(item.href)} />
           ))}
           <p className="mb-1 mt-6 px-3 text-xs font-medium text-ink-2">Coming soon</p>
           {comingSoonItems.map((item) => (
-            <NavLink key={item.href} item={item} active={pathname === item.href} muted />
+            <NavLink key={item.href} item={item} active={isActive(item.href)} muted />
           ))}
         </nav>
       </aside>
