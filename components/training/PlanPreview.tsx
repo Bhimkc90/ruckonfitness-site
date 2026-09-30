@@ -9,11 +9,14 @@ import { Card } from "@/components/ui/Card";
 import { Chip, PassFailBadge } from "@/components/ui/StatusBadge";
 import { BlockView } from "./PlanParts";
 
-export function FocusCard({ plan }: { plan: PlanDraft }) {
+export function FocusCard({ plan, sample = false }: { plan: PlanDraft; sample?: boolean }) {
   const { baseline } = plan;
   const ordered = [...plan.analysis].sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
   return (
-    <Card title="Your baseline and what the plan focuses on" description={`Baseline test from ${formatTestDate(baseline.testDate)} (a saved copy).`}>
+    <Card
+      title={sample ? "Sample baseline and what the plan focuses on" : "Your baseline and what the plan focuses on"}
+      description={sample ? "A synthetic AFT result, made up for this example and scored with the official scales." : `Baseline test from ${formatTestDate(baseline.testDate)} (a saved copy).`}
+    >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-2xl font-semibold text-ink">{baseline.result.total}</span>
         <span className="text-sm text-ink-2">/ 500</span>

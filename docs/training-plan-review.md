@@ -3,7 +3,11 @@
 Suggested training plans are built and tested but **off in production**. The flag is
 `NEXT_PUBLIC_TRAINING_PLANS` in `lib/features.ts`, inlined at build time. Production builds don't set it.
 
-To preview locally:
+While the flag is off, `/training-plan` shows three preview examples built by the same engine from synthetic
+AFT results (`lib/training/samples.ts`): a slow 2-mile run, a low deadlift, and a slow SDC with short sessions.
+They are labeled as unreviewed examples, and personalized plans, starting plans, and tracking stay unavailable.
+
+To preview the full personalized flow locally:
 
 ```bash
 NEXT_PUBLIC_TRAINING_PLANS=enabled npm run dev

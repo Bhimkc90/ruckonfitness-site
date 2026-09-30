@@ -462,3 +462,23 @@ describe("missing preferences", () => {
     expect(generatePlan({ baseline: baseline(), prefs: prefs({ equipment: [] }), screening: ok, startDate: START }).status).toBe("ready");
   });
 });
+
+describe("sample plans", () => {
+  it("builds distinct, linked preview plans from synthetic results", async () => {
+    const { buildSamplePlans } = await import("./samples");
+    const samples = buildSamplePlans();
+    expect(samples.map((s) => s.id)).toEqual(["run", "deadlift", "sdc"]);
+    const focus = samples.map((s) => s.plan.analysis.filter((a) => a.role === "develop").map((a) => a.event));
+    expect(focus).toEqual([["2MR"], ["MDL"], ["SDC"]]);
+    const mixes = new Set(samples.map((s) => s.plan.sessions.filter((x) => x.week === 1).map((x) => x.kind).sort().join(",")));
+    expect(mixes.size).toBe(3);
+    for (const s of samples) {
+      for (const session of s.plan.sessions) {
+        expect(session.warmUp.length && session.main.length && session.recovery.length).toBeTruthy();
+        for (const block of [...session.warmUp, ...session.main, ...session.recovery]) {
+          for (const item of block.items) if (item.kind === "exercise") expect(getExercise(item.exerciseId), item.exerciseId).toBeTruthy();
+        }
+      }
+    }
+  });
+});
