@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { name: "Dashboard", icon: HomeIcon, href: "/" },
+  { name: "Home", icon: HomeIcon, href: "/" },
   { name: "AFT Calculator", icon: Gauge, href: "/aft-calculator" },
   { name: "Score History", icon: LineChartIcon, href: "/score-history" },
   { name: "Training Plan", icon: Dumbbell, href: "/training-plan" },
@@ -27,8 +27,8 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="border-r border-zinc-800 bg-black p-6">
-      <nav className="space-y-3">
+    <aside className="border-b border-zinc-800 bg-black p-3 lg:border-b-0 lg:border-r lg:p-6">
+      <nav className="flex gap-2 overflow-x-auto lg:block lg:space-y-3">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href;
@@ -37,20 +37,21 @@ export default function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex w-full items-center gap-4 rounded-xl px-5 py-4 text-left font-bold uppercase transition ${
+              aria-current={active ? "page" : undefined}
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-left text-sm font-bold uppercase transition lg:w-full lg:gap-4 lg:px-5 lg:py-4 lg:text-base ${
                 active
                   ? "bg-yellow-400 text-black"
                   : "text-zinc-200 hover:bg-zinc-900 hover:text-yellow-400"
               }`}
             >
-              <Icon className="h-6 w-6" />
+              <Icon className="h-5 w-5 lg:h-6 lg:w-6" />
               {item.name}
             </Link>
           );
         })}
       </nav>
 
-      <div className="mt-24 rounded-2xl border border-yellow-500/50 p-6 text-center">
+      <div className="mt-24 hidden rounded-2xl border border-yellow-500/50 p-6 text-center lg:block">
         <h2 className="text-3xl font-black uppercase leading-tight text-yellow-400">
           Be All <br /> You Can Be.
         </h2>
