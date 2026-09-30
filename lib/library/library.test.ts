@@ -19,7 +19,8 @@ import {
 import type { LibraryFilters } from "./index";
 
 // Official exercise order, typed independently from ATP 7-22.02 (INCL C1):
-// para 3-1 (p. 3-1), para 5-1 (p. 5-1), para 5-18 (p. 5-9), and chapter 16 headings (pp. 16-1 – 16-6).
+// para 3-1 (p. 3-1), 4-15 – 4-18 (pp. 4-9 – 4-11), 8-3 – 8-5 (pp. 8-1 – 8-2), 5-1 (p. 5-1), 5-18 (p. 5-9),
+// and chapter 16 headings (pp. 16-1 – 16-6).
 const officialOrder: Record<string, string[]> = {
   "preparation-drill": [
     "Bend and Reach",
@@ -33,6 +34,8 @@ const officialOrder: Record<string, string[]> = {
     "Bent-Leg Body Twist",
     "Push-Up",
   ],
+  "four-for-the-core": ["Bent-Leg Raise", "Side Bridge", "Back Bridge", "Quadraplex"],
+  "military-movement-drill-1": ["Vertical", "Lateral", "Shuttle Sprint"],
   "conditioning-drill-1": ["Power Jump", "V-Up", "Mountain Climber", "Leg-Tuck and Twist", "Single-Leg Push-Up"],
   "conditioning-drill-2": ["Turn and Lunge", "Supine Bicycle", "Half Jack", "Swimmer", "8-Count T Push-Up"],
   "recovery-drill": [
@@ -56,14 +59,16 @@ describe("IDs and references", () => {
     for (const id of ids) expect(id).toMatch(kebab);
   });
 
-  it("includes exactly the four verified drills and 27 unique exercises", () => {
+  it("includes exactly the six verified drills and 37 unique exercises", () => {
     expect(drills.map((d) => d.id)).toEqual([
       "preparation-drill",
+      "four-for-the-core",
+      "military-movement-drill-1",
       "conditioning-drill-1",
       "conditioning-drill-2",
       "recovery-drill",
     ]);
-    expect(exercises).toHaveLength(27);
+    expect(exercises).toHaveLength(37);
   });
 
   it("matches the official exercise order for every drill", () => {
@@ -91,7 +96,13 @@ describe("IDs and references", () => {
     for (const exercise of exercises) {
       expect(exercise.executions.length).toBeGreaterThan(0);
       for (const execution of exercise.executions) {
-        expect(getDrill(execution.drillId)?.sequence, `${exercise.id} in ${execution.drillId}`).toContain(exercise.id);
+        if (execution.drillId) {
+          expect(getDrill(execution.drillId)?.sequence, `${exercise.id} in ${execution.drillId}`).toContain(exercise.id);
+        } else {
+          // Exercises outside a library drill name their official context and a session phase.
+          expect(execution.context, exercise.id).toBeTruthy();
+          expect(exercise.tags.phases?.length, exercise.id).toBeGreaterThan(0);
+        }
       }
     }
   });
@@ -149,17 +160,18 @@ describe("content and source coverage", () => {
       expect(exercise.verification.status).toBe("verified");
       for (const execution of exercise.executions) {
         expect(execution.steps.length).toBeGreaterThanOrEqual(3);
-        expect(["slow", "moderate", "hold"]).toContain(execution.cadence);
+        expect(["slow", "moderate", "hold", "course", "controlled"]).toContain(execution.cadence);
         expect(execution.startingPosition.length).toBeGreaterThan(5);
       }
     }
   });
 
-  it("uses held stretches only in the Recovery Drill and counted cadence elsewhere", () => {
+  it("uses held positions only in the Recovery Drill and Four for the Core, and courses only in MMD1", () => {
     for (const exercise of exercises) {
       for (const execution of exercise.executions) {
-        if (execution.drillId === "recovery-drill") expect(execution.cadence).toBe("hold");
+        if (execution.drillId === "recovery-drill" || execution.drillId === "four-for-the-core") expect(execution.cadence).toBe("hold");
         else expect(execution.cadence).not.toBe("hold");
+        expect(execution.cadence === "course").toBe(execution.drillId === "military-movement-drill-1");
       }
     }
   });
@@ -183,8 +195,8 @@ describe("filters", () => {
   const f = (overrides: Partial<LibraryFilters>): LibraryFilters => ({ ...emptyFilters, ...overrides });
 
   it("returns everything with no filters", () => {
-    expect(filterExercises(emptyFilters)).toHaveLength(27);
-    expect(filterDrills(emptyFilters)).toHaveLength(4);
+    expect(filterExercises(emptyFilters)).toHaveLength(37);
+    expect(filterDrills(emptyFilters)).toHaveLength(6);
     expect(hasActiveFilters(emptyFilters)).toBe(false);
     expect(hasActiveFilters(f({ query: "lunge" }))).toBe(true);
   });
@@ -194,8 +206,9 @@ describe("filters", () => {
     expect(filterExercises(f({ drill: "recovery-drill" }))).toHaveLength(8);
     expect(exercisePhases(getExercise("rear-lunge")!).sort()).toEqual(["recovery", "warm-up"]);
     expect(filterExercises(f({ phase: "recovery" }))).toHaveLength(8);
-    expect(filterExercises(f({ phase: "warm-up" }))).toHaveLength(10);
-    expect(filterExercises(f({ phase: "main" }))).toHaveLength(10);
+    expect(filterExercises(f({ phase: "warm-up" }))).toHaveLength(17);
+    expect(filterExercises(f({ phase: "main" }))).toHaveLength(13);
+    expect(ids(filterExercises(f({ equipment: "kettlebell" })))).toEqual(["deadlift", "straight-leg-deadlift", "sumo-squat"]);
   });
 
   it("combines purpose, drill, and AFT event filters", () => {
@@ -208,7 +221,13 @@ describe("filters", () => {
       "push-up",
       "single-leg-push-up",
     ]);
-    expect(ids(filterExercises(f({ aftEvent: "MDL" })))).toEqual(["squat-bender"]);
+    expect(ids(filterExercises(f({ aftEvent: "MDL" })))).toEqual([
+      "back-bridge",
+      "deadlift",
+      "squat-bender",
+      "straight-leg-deadlift",
+      "sumo-squat",
+    ]);
     expect(ids(filterExercises(f({ aftEvent: "HRP", drill: "conditioning-drill-1" })))).toEqual(["single-leg-push-up"]);
   });
 
@@ -234,7 +253,7 @@ describe("filters", () => {
 
   it("filters drills by phase and by exercises' AFT mappings", () => {
     expect(ids(filterDrills(f({ phase: "main" })))).toEqual(["conditioning-drill-1", "conditioning-drill-2"]);
-    expect(ids(filterDrills(f({ aftEvent: "MDL" })))).toEqual(["preparation-drill"]);
+    expect(ids(filterDrills(f({ aftEvent: "MDL" })))).toEqual(["four-for-the-core", "preparation-drill"]);
   });
 });
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { TRAINING_PLANS_ENABLED } from "@/lib/features";
 import {
   Backpack,
   BookOpen,
@@ -21,11 +22,12 @@ const primaryItems = [
   { name: "AFT Guide", icon: ClipboardList, href: "/aft-guide" },
   { name: "History", icon: History, href: "/score-history" },
   { name: "Library", icon: BookOpen, href: "/workouts" },
+  ...(TRAINING_PLANS_ENABLED ? [{ name: "Training plan", icon: Dumbbell, href: "/training-plan" }] : []),
 ];
 
-// Placeholder pages that exist but have no features yet.
+// Placeholder pages that exist but have no features yet (training plans until the release flag is on).
 const comingSoonItems = [
-  { name: "Training plan", icon: Dumbbell, href: "/training-plan" },
+  ...(TRAINING_PLANS_ENABLED ? [] : [{ name: "Training plan", icon: Dumbbell, href: "/training-plan" }]),
   { name: "Profile", icon: User, href: "/profile" },
   { name: "Settings", icon: Settings, href: "/settings" },
 ];

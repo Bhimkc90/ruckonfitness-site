@@ -17,6 +17,7 @@ import { saveAftResult } from "@/lib/storage/aftResults";
 import { Card } from "@/components/ui/Card";
 import { ButtonLink, buttonClass } from "@/components/ui/Button";
 import AftResultSummary from "./AftResultSummary";
+import { TRAINING_PLANS_ENABLED } from "@/lib/features";
 
 type SaveStatus =
   | { kind: "idle" }
@@ -233,6 +234,11 @@ export default function AftCalculator() {
                     <p className="text-sm text-ink">Saved to your history in this browser.</p>
                     <div className="flex flex-wrap gap-2">
                       <ButtonLink href="/dashboard">View dashboard</ButtonLink>
+                      {TRAINING_PLANS_ENABLED && (
+                        <ButtonLink href={`/training-plan/new?baseline=${status.id}`} variant="secondary">
+                          Suggest training plan
+                        </ButtonLink>
+                      )}
                       <button type="button" onClick={reset} className={buttonClass("secondary")}>
                         Record another
                       </button>

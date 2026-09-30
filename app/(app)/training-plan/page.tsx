@@ -1,19 +1,10 @@
 import type { Metadata } from "next";
-import { Card, PageHeader } from "@/components/ui/Card";
-import { ButtonLink } from "@/components/ui/Button";
+import { TRAINING_PLANS_ENABLED } from "@/lib/features";
+import PlanView from "@/components/training/PlanView";
+import UnderReview from "@/components/training/UnderReview";
 
 export const metadata: Metadata = { title: "Training plan" };
 
 export default function TrainingPlanPage() {
-  return (
-    <div>
-      <PageHeader title="Training plan" />
-      <Card>
-        <p className="text-sm text-ink-2">Training plans are currently in development.</p>
-        <ButtonLink href="/dashboard" variant="secondary" className="mt-4">
-          Back to dashboard
-        </ButtonLink>
-      </Card>
-    </div>
-  );
+  return TRAINING_PLANS_ENABLED ? <PlanView /> : <UnderReview />;
 }

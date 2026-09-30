@@ -27,6 +27,8 @@ import { Card, PageHeader } from "@/components/ui/Card";
 import { ButtonLink } from "@/components/ui/Button";
 import { PassFailBadge } from "@/components/ui/StatusBadge";
 import TrendChart, { type TrendPoint } from "./TrendChart";
+import DashboardPlanCard from "@/components/training/DashboardPlanCard";
+import { TRAINING_PLANS_ENABLED } from "@/lib/features";
 
 type Mode = "points" | "raw";
 
@@ -144,9 +146,16 @@ export default function Dashboard() {
               <History className="h-4 w-4" aria-hidden />
               View history
             </ButtonLink>
+            {TRAINING_PLANS_ENABLED && (
+              <ButtonLink href={`/training-plan/new?baseline=${latest.record.id}`} variant="secondary">
+                Suggest training plan
+              </ButtonLink>
+            )}
           </>
         }
       />
+
+      {TRAINING_PLANS_ENABLED && <DashboardPlanCard latestResultId={latest.record.id} />}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="sm:col-span-2 xl:col-span-1">

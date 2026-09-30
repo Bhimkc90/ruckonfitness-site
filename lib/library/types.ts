@@ -35,10 +35,12 @@ export type SourceRef = {
 export type OfficialDrillCategory = "Preparation Drill" | "Activity Drill" | "Recovery Drill";
 
 // FM 7-22 table 6-2 "H2F drills", Physical Component column.
-export type OfficialPhysicalComponent = "Muscular Endurance" | "Anaerobic Endurance";
+export type OfficialPhysicalComponent = "Muscular Endurance" | "Anaerobic Endurance" | "Aerobic Endurance";
 
-// ATP 7-22.02 para 1-17: slow = 50 counts per minute, moderate = 80. Recovery Drill stretches are held on command.
-export type Cadence = "slow" | "moderate" | "hold";
+// ATP 7-22.02 para 1-17: slow = 50 counts per minute, moderate = 80. Recovery Drill stretches and
+// Four for the Core positions are held on command. Military Movement Drills are performed over a
+// 25-meter course. Free Weight Training exercises have no prescribed cadence.
+export type Cadence = "slow" | "moderate" | "hold" | "course" | "controlled";
 
 // ---------------------------------------------------------------------------
 // RuckOn editorial tags (app classifications, not Army terminology)
@@ -57,7 +59,7 @@ export type Purpose =
 
 export type Phase = "warm-up" | "main" | "recovery";
 
-export type Equipment = "none";
+export type Equipment = "none" | "kettlebell" | "dumbbell" | "barbell-or-hex-bar";
 
 export type Impact = "no-jumping" | "jumping";
 
@@ -72,6 +74,8 @@ export type MovementPattern =
   | "trunk-extension"
   | "jump"
   | "locomotion"
+  | "run"
+  | "trunk-stability"
   | "stretch";
 
 export type Location = "open-ground";
@@ -97,7 +101,9 @@ export type PositionId =
   | "prone"
   | "supine"
   | "sitting"
-  | "squat";
+  | "squat"
+  | "six-point-stance"
+  | "side-lying";
 
 export type Position = {
   id: PositionId;
@@ -106,16 +112,24 @@ export type Position = {
   source?: SourceRef;
 };
 
-export type DrillId = "preparation-drill" | "conditioning-drill-1" | "conditioning-drill-2" | "recovery-drill";
+export type DrillId =
+  | "preparation-drill"
+  | "four-for-the-core"
+  | "military-movement-drill-1"
+  | "conditioning-drill-1"
+  | "conditioning-drill-2"
+  | "recovery-drill";
 
 export type ExecutionStep = {
   label: string; // "Count 1" or the command, e.g. "READY, STRETCH"
   text: string;
 };
 
-// How an exercise is performed inside one specific drill.
+// How an exercise is performed inside one specific drill, or (without drillId) in another
+// official context such as a Strength Training Circuit station or Free Weight Training.
 export type DrillExecution = {
-  drillId: DrillId;
+  drillId?: DrillId;
+  context?: string;
   position: PositionId;
   startingPosition: string;
   steps: ExecutionStep[];
@@ -144,6 +158,8 @@ export type Exercise = {
     impact: Impact;
     movementPatterns: MovementPattern[];
     locations: readonly Location[];
+    // Session phases for exercises that are not part of a library drill.
+    phases?: Phase[];
   };
   aft?: AftMapping;
   demonstrationUrl?: string; // only a verified, exercise-specific official link

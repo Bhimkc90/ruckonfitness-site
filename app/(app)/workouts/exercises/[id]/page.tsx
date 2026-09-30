@@ -68,17 +68,18 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <div className="space-y-6">
           {exercise.executions.map((execution) => {
-            const drill = getDrill(execution.drillId)!;
-            const index = drill.sequence.indexOf(exercise.id);
-            const previous = index > 0 ? getExercise(drill.sequence[index - 1]) : undefined;
-            const next = index < drill.sequence.length - 1 ? getExercise(drill.sequence[index + 1]) : undefined;
+            const drill = execution.drillId ? getDrill(execution.drillId) : undefined;
+            const index = drill ? drill.sequence.indexOf(exercise.id) : -1;
+            const previous = drill && index > 0 ? getExercise(drill.sequence[index - 1]) : undefined;
+            const next = drill && index < drill.sequence.length - 1 ? getExercise(drill.sequence[index + 1]) : undefined;
             const position = positions[execution.position];
+            const contextName = drill ? drill.name : (execution.context ?? "");
 
             return (
               <Card
-                key={execution.drillId}
-                title={exercise.executions.length > 1 ? `In the ${drill.name}` : "How to perform it"}
-                description={`${drill.name}, exercise ${index + 1} of ${drill.sequence.length}`}
+                key={execution.drillId ?? execution.context}
+                title={exercise.executions.length > 1 ? (drill ? `In the ${drill.name}` : `In ${contextName}`) : "How to perform it"}
+                description={drill ? `${drill.name}, exercise ${index + 1} of ${drill.sequence.length}` : contextName}
               >
                 <div className="flex flex-wrap gap-1.5">
                   <Tag tone="official">{cadenceLabels[execution.cadence]}</Tag>
@@ -100,7 +101,7 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
                 )}
 
                 <h3 className="mt-4 text-sm font-semibold text-ink">
-                  {execution.cadence === "hold" ? "Commands and movement" : "Counts"}
+                  {execution.cadence === "hold" ? "Commands and movement" : execution.cadence === "slow" || execution.cadence === "moderate" ? "Counts" : "Movement"}
                 </h3>
                 <ol className="mt-2 space-y-2">
                   {execution.steps.map((step, stepIndex) => (
@@ -126,6 +127,7 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
                   <Citation source={execution.source} />
                 </p>
 
+                {drill && (
                 <nav aria-label={`${drill.name} sequence`} className="mt-4 flex justify-between gap-2 border-t border-line pt-3 text-sm">
                   {previous ? (
                     <Link href={exerciseHref(previous.id)} className="inline-flex items-center gap-1 text-ink-2 hover:text-ink">
@@ -147,6 +149,7 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
                     </Link>
                   )}
                 </nav>
+                )}
               </Card>
             );
           })}
@@ -204,6 +207,13 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
                   {drill.officialCategory}
                 </Tag>
               ))}
+              {exercise.executions
+                .filter((execution) => !execution.drillId && execution.context)
+                .map((execution) => (
+                  <Tag key={execution.context} tone="official">
+                    {execution.context}
+                  </Tag>
+                ))}
             </div>
             <h3 className="mt-4 text-xs font-semibold text-ink-2">RuckOn tags</h3>
             <dl className="mt-1.5 space-y-2 text-sm">

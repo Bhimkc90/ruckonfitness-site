@@ -56,6 +56,61 @@ export const drills: Drill[] = [
     verification,
   },
   {
+    id: "four-for-the-core",
+    name: "Four for the Core",
+    abbreviation: "4C",
+    program: "army-h2f",
+    officialCategory: "Preparation Drill",
+    officialComponent: "Muscular Endurance",
+    summary:
+      "Four held core exercises that provide a foundation of stability for all physical readiness exercises, added to the ATP by Change 1.",
+    sequence: ["bent-leg-raise", "side-bridge", "back-bridge", "quadraplex"],
+    officialGuidance: [
+      {
+        text: "The core (abdomen, pelvis, and lower spine) provides stability and motion for the limbs and trunk; regular performance of Four for the Core builds a foundation of stability.",
+        source: atp("4-14", "4-8"),
+      },
+      {
+        text: "Returning to the Position of Attention between exercises resets posture and checks movement to and from the ground.",
+        source: atp("4-14", "4-8"),
+      },
+      { text: "Four for the Core is one of the drills used to prepare for physical activity.", source: atp("1-17", "1-7") },
+    ],
+    officialPrescription: {
+      text: "Each exercise is held for a count of 60 seconds (each side where applicable); the Back Bridge alternates legs every 5 seconds for 6 repetitions.",
+      source: atp("4-15 – 4-18", "4-9 – 4-11"),
+    },
+    tags: { purposes: ["balance-stability", "strength"], phase: "warm-up" },
+    sources: [atp("1-17", "1-7"), atp("4-14 – 4-18", "4-8 – 4-11"), fm("Table 6-2", "6-5")],
+    verification,
+  },
+  {
+    id: "military-movement-drill-1",
+    name: "Military Movement Drill 1",
+    abbreviation: "MMD1",
+    program: "army-h2f",
+    officialCategory: "Preparation Drill",
+    officialComponent: "Aerobic Endurance",
+    summary:
+      "A dynamic preparation activity that develops coordination of foot movement in multiple planes at varying speeds before more vigorous endurance and mobility work.",
+    sequence: ["vertical", "lateral", "shuttle-sprint"],
+    officialGuidance: [
+      {
+        text: "A dynamic preparation activity for the more vigorous endurance and mobility activities in physical training.",
+        source: atp("8-1", "8-1"),
+      },
+      { text: "Each exercise is performed over a 25-meter course.", source: atp("8-3 – 8-5", "8-1 – 8-2") },
+      { text: "The Military Movement Drill is one of the drills used to prepare for physical activity.", source: atp("1-17", "1-7") },
+    ],
+    officialPrescription: {
+      text: "Vertical: 25 meters and back. Lateral: 25 meters each direction. Shuttle Sprint: three 25-meter legs with two turns.",
+      source: atp("8-3 – 8-5", "8-1 – 8-2"),
+    },
+    tags: { purposes: ["agility", "speed"], phase: "warm-up" },
+    sources: [atp("1-17", "1-7"), atp("8-1 – 8-5", "8-1 – 8-2"), fm("Table 6-2", "6-5")],
+    verification,
+  },
+  {
     id: "conditioning-drill-1",
     name: "Conditioning Drill 1",
     abbreviation: "CD1",

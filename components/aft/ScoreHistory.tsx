@@ -10,6 +10,8 @@ import { deleteAftResult, useAftResults, useHydrated } from "@/lib/storage/aftRe
 import { Card } from "@/components/ui/Card";
 import { ButtonLink } from "@/components/ui/Button";
 import { Chip, PassFailBadge } from "@/components/ui/StatusBadge";
+import Link from "next/link";
+import { TRAINING_PLANS_ENABLED } from "@/lib/features";
 
 function PointsChange({ value }: { value: number | null }) {
   if (value === null) return <span className="text-ink-2">—</span>;
@@ -158,6 +160,12 @@ function HistoryEntry({ item }: { item: TestProgress }) {
 
       <footer className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-ink-2">*Compared with the last test in the same scoring category.</p>
+        <div className="flex items-center gap-2">
+        {TRAINING_PLANS_ENABLED && (
+          <Link href={`/training-plan/new?baseline=${record.id}`} className="rounded-lg px-2 py-1 text-xs font-medium text-accent hover:bg-accent/10">
+            Suggest training plan<span className="sr-only"> from {testLabel(item)}</span>
+          </Link>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -170,6 +178,7 @@ function HistoryEntry({ item }: { item: TestProgress }) {
           <Trash2 className="h-3.5 w-3.5" aria-hidden />
           Delete<span className="sr-only"> result from {testLabel(item)}</span>
         </button>
+        </div>
       </footer>
     </article>
   );

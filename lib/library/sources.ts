@@ -99,6 +99,16 @@ export const positions: Record<Position["id"], Position> = {
       "Seated with both legs straight and together, reached from Half-Kneeling without using the hands; hands then rest on the ground beside the hips, fingers forward.",
     source: atp("2-12", "2-4"),
   },
+  "six-point-stance": {
+    id: "six-point-stance",
+    name: "Six-Point Stance",
+    description: "A modified Front Leaning Rest: from the Front Leaning Rest, drop the knees to the ground with the toes pointed to the rear.",
+    source: atp("2-4", "2-2"),
+  },
+  "side-lying": {
+    id: "side-lying",
+    name: "Side-lying",
+  },
   squat: {
     id: "squat",
     name: "Squat",

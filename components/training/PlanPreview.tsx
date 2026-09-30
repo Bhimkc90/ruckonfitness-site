@@ -1,0 +1,153 @@
+"use client";
+
+import { Info } from "lucide-react";
+import { aftEventInfo } from "@/lib/aft/scoring";
+import { formatTestDate } from "@/lib/aft/format";
+import { defaultSessionDate, weekdayLabels, SOURCES_FOR_PLAN } from "@/lib/training/engine";
+import type { PlanDraft, PlanSession } from "@/lib/training/types";
+import { Card } from "@/components/ui/Card";
+import { Chip, PassFailBadge } from "@/components/ui/StatusBadge";
+import { BlockView } from "./PlanParts";
+
+export function FocusCard({ plan }: { plan: PlanDraft }) {
+  const { baseline } = plan;
+  return (
+    <Card title="Baseline and focus" description={`Baseline test from ${formatTestDate(baseline.testDate)} (a saved copy).`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-2xl font-semibold text-ink">{baseline.result.total}</span>
+        <span className="text-sm text-ink-2">/ 500</span>
+        <PassFailBadge passed={baseline.result.passed} />
+      </div>
+      <ul className="mt-4 space-y-2 text-sm">
+        {plan.analysis.map((a) => (
+          <li key={a.event} className="flex gap-2">
+            <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${a.role === "develop" ? "bg-accent/15 text-accent" : "bg-surface-2 text-ink-2"}`}>
+              {a.role === "develop" ? "Focus" : "Maintain"}
+            </span>
+            <span className="text-ink">{a.reason}</span>
+          </li>
+        ))}
+      </ul>
+      <ul className="mt-4 space-y-1 text-xs text-ink-2">
+        {plan.focusSummary.map((s) => (
+          <li key={s}>{s}</li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+export function NotesCard({ plan }: { plan: PlanDraft }) {
+  return (
+    <Card title="Limits, assumptions, and next assessment">
+      {plan.limitations.length > 0 && (
+        <>
+          <h3 className="text-sm font-semibold text-ink">What this plan can&apos;t do</h3>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink">
+            {plan.limitations.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {plan.scheduleNotes.length > 0 && (
+        <>
+          <h3 className="mt-4 text-sm font-semibold text-ink">Schedule changes</h3>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink">
+            {plan.scheduleNotes.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      <h3 className="mt-4 text-sm font-semibold text-ink">Reassessment</h3>
+      <p className="mt-1 text-sm text-ink">{plan.reassessment}</p>
+      <p className="mt-3 text-xs text-ink-2">Planned running: about {plan.weeklyRunningMinutes} minutes a week.</p>
+      <details className="mt-4 text-sm">
+        <summary className="cursor-pointer font-medium text-ink">RuckOn assumptions (not from Army sources)</summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-ink-2">
+          {plan.assumptions.map((a) => (
+            <li key={a}>{a}</li>
+          ))}
+        </ul>
+      </details>
+      <details className="mt-2 text-sm">
+        <summary className="cursor-pointer font-medium text-ink">Sources for the plan structure</summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-ink-2">
+          {SOURCES_FOR_PLAN.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ul>
+      </details>
+      <p className="mt-3 text-xs text-ink-2">Template version: {plan.templateVersion}</p>
+    </Card>
+  );
+}
+
+export function SessionBody({ session, useBuild }: { session: PlanSession; useBuild: boolean }) {
+  const sections: [string, typeof session.warmUp][] = [
+    ["Warm-up", session.warmUp],
+    ["Main workout", session.main],
+    ["Recovery", session.recovery],
+  ];
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-ink-2">{session.purpose}</p>
+      {sections.map(([label, blocks]) => (
+        <div key={label}>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-2">{label}</h4>
+          <ul className="mt-1.5 space-y-2">
+            {blocks.map((block) => (
+              <BlockView key={block.id} block={block} useBuild={useBuild} condensed={block.id === "pd-condensed"} />
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function PlanPreview({ plan, startDate }: { plan: PlanDraft; startDate: string }) {
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-5 lg:grid-cols-2">
+        <FocusCard plan={plan} />
+        <NotesCard plan={plan} />
+      </div>
+      <Card title="Four-week schedule" description="Weeks 1–2 build the foundation; weeks 3–4 add a little volume if the earlier weeks went well.">
+        <div className="space-y-4">
+          {[1, 2, 3, 4].map((week) => (
+            <details key={week} open={week === 1} className="rounded-lg border border-line p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-ink">
+                Week {week} <span className="font-normal text-ink-2">· {week <= 2 ? "Foundation" : "Build"}</span>
+              </summary>
+              <ul className="mt-3 space-y-3">
+                {plan.sessions
+                  .filter((s) => s.week === week)
+                  .map((session) => (
+                    <li key={session.id} className="rounded-lg border border-line bg-surface p-3">
+                      <details>
+                        <summary className="flex cursor-pointer flex-wrap items-baseline justify-between gap-2">
+                          <span className="text-sm font-medium text-ink">
+                            {weekdayLabels[session.weekday]} {formatTestDate(defaultSessionDate(startDate, week, session.weekday), "short")} · {session.title}
+                          </span>
+                          <Chip>about {session.estimatedMinutes} min</Chip>
+                        </summary>
+                        <div className="mt-3">
+                          <SessionBody session={session} useBuild={week >= 3} />
+                        </div>
+                      </details>
+                    </li>
+                  ))}
+              </ul>
+            </details>
+          ))}
+        </div>
+        <p className="mt-3 flex gap-1.5 text-xs text-ink-2">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          Focus events: {plan.analysis.filter((a) => a.role === "develop").map((a) => aftEventInfo[a.event].name).join(", ") || "none (balanced plan)"}.
+        </p>
+      </Card>
+    </div>
+  );
+}

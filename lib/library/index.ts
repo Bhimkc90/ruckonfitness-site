@@ -3,12 +3,20 @@ import type { Drill, DrillId, Equipment, Exercise, Impact, MovementPattern, Phas
 import { preparationExercises } from "./exercises-preparation";
 import { conditioningExercises } from "./exercises-conditioning";
 import { recoveryExercises } from "./exercises-recovery";
+import { fourForTheCoreExercises, loadedExercises, militaryMovementExercises } from "./exercises-additional";
 import { drills, workoutTemplates } from "./drills";
 
 export { drills, workoutTemplates };
 export { sources, positions, formatSourceRef } from "./sources";
 
-export const exercises: Exercise[] = [...preparationExercises, ...conditioningExercises, ...recoveryExercises];
+export const exercises: Exercise[] = [
+  ...preparationExercises,
+  ...fourForTheCoreExercises,
+  ...militaryMovementExercises,
+  ...conditioningExercises,
+  ...recoveryExercises,
+  ...loadedExercises,
+];
 
 const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]));
 const drillById = new Map(drills.map((drill) => [drill.id, drill]));
@@ -35,7 +43,7 @@ export function drillMemberships(exerciseId: string): { drill: Drill; order: num
 // An exercise's session phases come from the official category of the drills it belongs to.
 export function exercisePhases(exercise: Exercise): Phase[] {
   const phases = drillMemberships(exercise.id).map(({ drill }) => drill.tags.phase);
-  return Array.from(new Set(phases));
+  return Array.from(new Set([...phases, ...(exercise.tags.phases ?? [])]));
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +68,12 @@ export const phaseLabels: Record<Phase, string> = {
   recovery: "Recovery",
 };
 
-export const equipmentLabels: Record<Equipment, string> = { none: "No equipment" };
+export const equipmentLabels: Record<Equipment, string> = {
+  none: "No equipment",
+  kettlebell: "Kettlebells",
+  dumbbell: "Dumbbells",
+  "barbell-or-hex-bar": "Barbell or hex bar",
+};
 
 export const impactLabels: Record<Impact, string> = { "no-jumping": "No jumping", jumping: "Includes jumping" };
 
@@ -75,13 +88,17 @@ export const movementLabels: Record<MovementPattern, string> = {
   "trunk-extension": "Trunk extension",
   jump: "Jump",
   locomotion: "Locomotion",
+  run: "Running",
+  "trunk-stability": "Trunk stability (hold)",
   stretch: "Stretch",
 };
 
 export const cadenceLabels = {
   slow: "Slow cadence (50 counts per minute)",
   moderate: "Moderate cadence (80 counts per minute)",
-  hold: "Held stretch, on command",
+  hold: "Held position, on command",
+  course: "Over a 25-meter course",
+  controlled: "Controlled pace (no cadence prescribed)",
 } as const;
 
 export const aftEventLabels: Record<AftEventCode, string> = {
