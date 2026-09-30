@@ -1,4 +1,4 @@
-import type { Drill, WorkoutTemplate } from "./types";
+import type { Drill } from "./types";
 import { VERIFIED_ON, atp, fm } from "./sources";
 
 const verification = { status: "verified", checkedOn: VERIFIED_ON } as const;
@@ -212,34 +212,5 @@ export const drills: Drill[] = [
       "The ATP also describes a modified Recovery Drill (RD MOD) with restricted range of motion. It is not included in this library yet.",
     sources: [atp("1-25", "1-9"), atp("16-1 – 16-10", "16-1 – 16-6"), fm("Table 6-2", "6-5")],
     verification,
-  },
-];
-
-// App suggestions built only from the official drills above. They are not Army-prescribed sessions.
-export const workoutTemplates: WorkoutTemplate[] = [
-  {
-    id: "foundational-drill-session",
-    name: "Foundational drill session",
-    description:
-      "A RuckOn example that strings the four drills in the order FM 7-22 describes for a session: preparation, then the main activity, then recovery.",
-    origin: "ruckon-suggestion",
-    blocks: [
-      { phase: "warm-up", items: [{ kind: "drill", drillId: "preparation-drill", prescription: "10 repetitions of each exercise" }] },
-      {
-        phase: "main",
-        items: [
-          { kind: "drill", drillId: "conditioning-drill-1", prescription: "10 repetitions of each exercise" },
-          { kind: "drill", drillId: "conditioning-drill-2", prescription: "10 repetitions of each exercise" },
-        ],
-      },
-      { phase: "recovery", items: [{ kind: "drill", drillId: "recovery-drill", prescription: "Hold each stretch 20–30 seconds" }] },
-    ],
-    basis: [
-      { text: "Sessions prepare for the main activity first and finish with recovery.", source: fm("6-22 – 6-26", "6-4 – 6-6") },
-      {
-        text: "Graduated Soldiers perform ten repetitions of the Preparation and Conditioning Drills to standard.",
-        source: atp("1-21", "1-7"),
-      },
-    ],
   },
 ];

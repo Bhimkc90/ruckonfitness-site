@@ -1,7 +1,7 @@
 import type { AftEventCode } from "@/lib/aft/types";
 import { aftEventInfo, aftEventOrder } from "@/lib/aft/scoring";
 import { aftStandardRules } from "@/lib/aft/rules";
-import { formatRaw } from "@/lib/aft/format";
+import { describeCategory, formatRaw } from "@/lib/aft/format";
 import { formatSeconds } from "@/lib/aft/validation";
 import { getDrill, getExercise } from "@/lib/library";
 import type { DrillId } from "@/lib/library/types";
@@ -14,6 +14,7 @@ import type {
   PlanItem,
   PlanOutcome,
   PlanSession,
+  PreferenceAnswers,
   Preferences,
   Prescription,
   Restriction,
@@ -40,55 +41,70 @@ const HANDS_POSITIONS = new Set(["front-leaning-rest", "six-point-stance"]);
 // Baseline analysis
 // ---------------------------------------------------------------------------
 
-export function analyzeBaseline(baseline: BaselineSnapshot): { analysis: EventAnalysis[]; summary: string[] } {
+export function analyzeBaseline(baseline: BaselineSnapshot): {
+  analysis: EventAnalysis[];
+  summary: string[];
+  standardSummary: string;
+  priorities: AftEventCode[];
+} {
   const { result } = baseline;
   const rule = aftStandardRules[result.standard];
   const events = aftEventOrder.map((event) => {
     const entry = result.events.find((e) => e.event === event)!;
     return { event, points: entry.points, raw: entry.raw, passed: entry.points >= rule.minEventPoints };
   });
+  const byPoints = (list: typeof events) => [...list].sort((a, b) => a.points - b.points || aftEventOrder.indexOf(a.event) - aftEventOrder.indexOf(b.event));
 
   const failed = events.filter((e) => !e.passed);
-  let develop: AftEventCode[];
+  let priorities: AftEventCode[];
   let basis: "failed" | "lowest" | "balanced";
   if (failed.length > 0) {
-    develop = failed.map((e) => e.event);
+    priorities = byPoints(failed).map((e) => e.event);
     basis = "failed";
   } else {
-    const sorted = [...events].sort((a, b) => a.points - b.points);
+    const sorted = byPoints(events);
     const cutoff = sorted[1].points;
     const lowest = sorted.filter((e) => e.points <= cutoff);
     if (lowest.length > 3 || sorted[0].points === 100) {
-      develop = [];
+      priorities = [];
       basis = "balanced";
     } else {
-      develop = lowest.map((e) => e.event);
+      priorities = lowest.map((e) => e.event);
       basis = "lowest";
     }
   }
 
+  const standardName = `${rule.label.toLowerCase()} standard`;
   const analysis: EventAnalysis[] = events.map((e) => {
     const name = aftEventInfo[e.event].name;
     const raw = formatRaw(e.event, e.raw);
-    const role = develop.includes(e.event) ? "develop" : "maintain";
+    const index = priorities.indexOf(e.event);
+    const priority = index === -1 ? null : index + 1;
     let reason: string;
-    if (!e.passed) reason = `${name}: ${e.points} points (${raw}) is below the ${rule.minEventPoints}-point minimum, so it is a development focus.`;
-    else if (role === "develop") reason = `${name}: ${e.points} points (${raw}) is one of your lowest-scoring events, so it gets extra work.`;
-    else reason = `${name}: ${e.points} points (${raw}). Maintained with lighter work.`;
-    return { ...e, role, reason };
+    if (!e.passed) reason = `${name}: ${e.points} points (${raw}) is below the ${rule.minEventPoints}-point minimum for the ${standardName}. Focus priority ${priority}.`;
+    else if (priority) reason = `${name}: ${e.points} points (${raw}) is one of your lowest-scoring events. Focus priority ${priority}.`;
+    else reason = `${name}: ${e.points} points (${raw}) is a stronger event, so it keeps maintenance work.`;
+    return { ...e, role: priority ? "develop" : "maintain", priority, reason };
   });
 
+  const combat = result.standard === "combat";
+  const standardSummary = `Scored as ${describeCategory({ standard: result.standard, ageGroup: result.ageGroup, column: result.column })}. The ${standardName} requires at least ${rule.minEventPoints} points on every event${combat ? ` and a total of at least ${rule.minTotalPoints}` : ""}. Baseline total ${result.total}: ${result.passed ? "pass" : "fail"}.`;
+
   const summary: string[] = [];
-  if (basis === "failed") summary.push(`Your baseline did not meet the ${rule.label.toLowerCase()} standard on ${failed.length} event${failed.length > 1 ? "s" : ""}; those come first.`);
-  if (basis === "lowest") summary.push("You met the minimum on every event, so the plan emphasizes your lowest-scoring events.");
+  const list = (codes: AftEventCode[]) => codes.map((c) => aftEventInfo[c].name).join(", ");
+  if (basis === "failed") summary.push(`Failed the ${standardName}: ${list(priorities)}. These come first, lowest score first.`);
+  else summary.push(`No event failed the ${standardName}.`);
+  if (basis === "lowest") summary.push(`Most improvement needed: ${list(priorities)}, your lowest-scoring events.`);
   if (basis === "balanced") summary.push("Your event scores are too even to single out a focus, so the plan keeps a balanced mix.");
   if (!result.passed && failed.length === 0) {
-    summary.push(`Your total of ${result.total} is below the ${rule.minTotalPoints}-point ${rule.label.toLowerCase()} standard; the plan emphasizes your lowest-scoring events.`);
+    summary.push(`Your total of ${result.total} is below the ${rule.minTotalPoints}-point ${standardName}, so your lowest-scoring events get extra work.`);
   }
+  const maintained = events.filter((e) => !priorities.includes(e.event)).map((e) => e.event);
+  if (maintained.length) summary.push(`Maintained: ${list(maintained)}.`);
   summary.push(
     "Points compare you with the Army's score tables, not events with each other. RuckOn uses them only to order emphasis; they are not a validated way to divide training time."
   );
-  return { analysis, summary };
+  return { analysis, summary, standardSummary, priorities };
 }
 
 // ---------------------------------------------------------------------------
@@ -541,12 +557,33 @@ function permutations<T>(items: T[]): T[][] {
   return result;
 }
 
-export function weeklyKinds(days: number, speedPossible: boolean, emphasis: { run: boolean; sdc: boolean }): SessionKind[] {
+// Session mix for one week. Every week keeps one strength and one aerobic session so stronger events are
+// maintained; the remaining days follow the focus events in priority order.
+export function weeklyKinds(days: number, speedPossible: boolean, priorities: AftEventCode[]): SessionKind[] {
   const speed: SessionKind = speedPossible ? "speed" : "conditioning";
-  if (days === 2) return ["strength", emphasis.sdc && !emphasis.run ? speed : "endurance"];
-  if (days === 3) return ["strength", speed, "endurance"];
-  if (days === 4) return ["strength", speed, "strength", "endurance"];
-  return ["strength", speed, "recovery", "strength", "endurance"];
+  const kindFor = (event: AftEventCode): SessionKind => (event === "2MR" ? "endurance" : event === "SDC" ? speed : "strength");
+  const focusKinds = Array.from(new Set(priorities.map(kindFor)));
+
+  if (days === 2) return ["strength", focusKinds[0] === speed ? speed : "endurance"];
+
+  const kinds: SessionKind[] = ["strength", "endurance"];
+  let slots = days - 2;
+  if (days >= 5) {
+    kinds.push("recovery");
+    slots--;
+  }
+  if (days >= 4 && !focusKinds.includes(speed)) {
+    kinds.push(speed); // weekly speed running (ATP 7-22.02 para 1-24)
+    slots--;
+  }
+  const cycle: SessionKind[] = focusKinds.length ? focusKinds : days >= 4 ? ["strength", "endurance"] : [speed];
+  for (let i = 0; i < slots; i++) {
+    let kind = cycle[i % cycle.length];
+    // A second SDC session practices SDC skills without sprinting.
+    if (kind === "speed" && kinds.includes("speed")) kind = "conditioning";
+    kinds.push(kind);
+  }
+  return kinds;
 }
 
 export function assignKinds(days: WeekdayId[], kinds: SessionKind[]): { kinds: SessionKind[]; notes: string[] } {
@@ -583,6 +620,15 @@ export function assignKinds(days: WeekdayId[], kinds: SessionKind[]): { kinds: S
 // ---------------------------------------------------------------------------
 
 const isDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+
+export function missingAnswers(answers: PreferenceAnswers): string[] {
+  const missing: string[] = [];
+  if (answers.equipment === null) missing.push("Tell us what equipment you can use, or choose \"No equipment\". AFT scores can't tell RuckOn what you have.");
+  if (answers.runningAccess === null) missing.push("Tell us whether you have a safe place to run.");
+  if (answers.experience === null) missing.push("Choose your current training experience. AFT points can't show how much training you're used to.");
+  if (answers.recentRunning === null) missing.push("Choose how much you have run recently. Run time alone can't set a safe running volume.");
+  return missing;
+}
 
 export function validatePreferences(prefs: Preferences, startDate: string): string[] {
   const errors: string[] = [];
@@ -637,16 +683,69 @@ export function weekWindow(startDate: string, week: number): { from: string; to:
 }
 
 // ---------------------------------------------------------------------------
+// Plain-language explanation of how the findings changed the sessions
+// ---------------------------------------------------------------------------
+
+function explainSessions(input: {
+  kinds: SessionKind[];
+  priorities: AftEventCode[];
+  roles: Record<AftEventCode, "develop" | "maintain">;
+  ctx: Ctx;
+  runMinutes: number;
+  speedPossible: boolean;
+}): string[] {
+  const { kinds, priorities, roles, ctx, runMinutes, speedPossible } = input;
+  const count = (k: SessionKind) => kinds.filter((x) => x === k).length;
+  const days = kinds.length;
+  const lines: string[] = [];
+  const strengthFocus = priorities.filter((e) => e === "MDL" || e === "HRP" || e === "PLK");
+
+  if (priorities.includes("2MR")) {
+    lines.push(
+      ctx.runAllowed && ctx.hasRunningBase
+        ? `2-mile run focus: ${count("endurance")} of your ${days} weekly sessions are easy runs of up to ${runMinutes} minutes, within the running you reported.`
+        : `2-mile run focus: ${count("endurance")} of your ${days} weekly sessions are aerobic sessions, but they are walks because running isn't part of this plan (see limits).`
+    );
+  }
+  if (strengthFocus.length) {
+    lines.push(
+      `${strengthFocus.map((e) => aftEventInfo[e].shortName).join(" and ")} focus: ${count("strength")} strength session${count("strength") > 1 ? "s" : ""} a week, each starting with development work for ${strengthFocus.length > 1 ? "those events" : "that event"}.`
+    );
+  }
+  if (priorities.includes("SDC")) {
+    lines.push(
+      speedPossible
+        ? `Sprint-drag-carry focus: a speed session with sprint intervals${count("conditioning") ? ", plus a non-sprint SDC skills session" : ""}.`
+        : "Sprint-drag-carry focus: conditioning drills and lateral movement replace sprinting (see limits)."
+    );
+  }
+  if (priorities.length === 0) lines.push("Balanced plan: sessions are spread across strength, running, and speed work.");
+
+  const maintained = (Object.keys(roles) as AftEventCode[]).filter((e) => roles[e] === "maintain");
+  if (maintained.length) {
+    const where: string[] = [];
+    if (maintained.some((e) => e === "MDL" || e === "HRP" || e === "PLK")) where.push("shorter maintenance blocks in strength sessions");
+    if (maintained.includes("2MR")) where.push(count("endurance") ? "an easier aerobic session" : "aerobic work in other sessions");
+    if (maintained.includes("SDC") && (count("speed") || count("conditioning"))) where.push("the weekly speed or conditioning session");
+    const joinList = (items: string[]) => (items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
+    lines.push(`Stronger events (${maintained.map((e) => aftEventInfo[e].shortName).join(", ")}) keep ${joinList(where) || "maintenance work"}.`);
+  }
+  if (ctx.prefs.experience === "new" && (count("speed") > 0)) lines.push("Because you're new or returning to training, sprint intervals start with fewer repeats.");
+  if (ctx.prefs.sessionMinutes === 30) lines.push("30-minute sessions use the Army's condensed Preparation Drill so more time goes to the main work.");
+  return lines;
+}
+
+// ---------------------------------------------------------------------------
 // Plan generation
 // ---------------------------------------------------------------------------
 
 export function generatePlan(input: {
   baseline: BaselineSnapshot | null;
-  prefs: Preferences;
+  prefs: PreferenceAnswers;
   screening: Screening;
   startDate: string;
 }): PlanOutcome {
-  const { baseline, prefs, screening, startDate } = input;
+  const { baseline, screening, startDate } = input;
   if (!baseline) return { status: "invalid", errors: ["Choose a saved AFT result to use as your baseline."] };
   if (screening.currentPain === null) return { status: "invalid", errors: ["Answer the question about current pain."] };
   if (screening.currentPain) return { status: "paused", message: PAIN_MESSAGE };
@@ -659,6 +758,9 @@ export function generatePlan(input: {
       ],
     };
   }
+  const missing = missingAnswers(input.prefs);
+  if (missing.length) return { status: "invalid", errors: missing };
+  const prefs = input.prefs as Preferences;
   const errors = validatePreferences(prefs, startDate);
   if (errors.length) return { status: "invalid", errors };
 
@@ -672,7 +774,7 @@ export function generatePlan(input: {
     };
   }
 
-  const { analysis, summary } = analyzeBaseline(baseline);
+  const { analysis, summary, standardSummary, priorities } = analyzeBaseline(baseline);
   const roles = Object.fromEntries(analysis.map((a) => [a.event, a.role])) as Record<AftEventCode, "develop" | "maintain">;
   const ctx: Ctx = {
     prefs,
@@ -682,7 +784,7 @@ export function generatePlan(input: {
     runAllowed: !restrictions.has("no-running") && prefs.runningAccess,
     hasRunningBase: prefs.recentRunning !== "none",
     limitations: new Set(),
-    assumptions: new Set([ASSUMPTIONS.focus, ASSUMPTIONS.scheduling, ASSUMPTIONS.progressionGate, ASSUMPTIONS.durations, ASSUMPTIONS.reassessment, ASSUMPTIONS.screening]),
+    assumptions: new Set([ASSUMPTIONS.focus, ASSUMPTIONS.sessionMix, ASSUMPTIONS.scheduling, ASSUMPTIONS.progressionGate, ASSUMPTIONS.durations, ASSUMPTIONS.reassessment, ASSUMPTIONS.screening]),
   };
 
   const develop = analysis.filter((a) => a.role === "develop").map((a) => a.event);
@@ -705,7 +807,7 @@ export function generatePlan(input: {
     );
   }
 
-  const planned = weeklyKinds(prefs.daysPerWeek, speedPossible, { run: roles["2MR"] === "develop", sdc: roles.SDC === "develop" });
+  const planned = weeklyKinds(prefs.daysPerWeek, speedPossible, priorities);
   const { kinds, notes } = assignKinds(prefs.weekdays, planned);
   const days = [...prefs.weekdays].sort((a, b) => weekIndex(a) - weekIndex(b));
 
@@ -717,7 +819,12 @@ export function generatePlan(input: {
     const sprintMinutes = speedCount * (4 + 1); // up to 6 × 30 s of sprinting plus the Shuttle Sprint, rounded up
     const available = Math.max(0, runLimits.perWeek - sprintMinutes);
     runMinutes = Math.min(runLimits.perRun, Math.floor(available / enduranceCount));
-    if (runMinutes < runLimits.perRun) ctx.limitations.add(`Running: each run is limited to ${runMinutes} minutes so your weekly running stays within what you reported.`);
+    if (roles["2MR"] === "maintain") {
+      runMinutes = Math.min(runMinutes, 20);
+      ctx.assumptions.add(ASSUMPTIONS.maintenanceRun);
+    } else if (runMinutes < runLimits.perRun) {
+      ctx.limitations.add(`Running: each run is limited to ${runMinutes} minutes so your weekly running stays within what you reported.`);
+    }
   }
 
   // One body per weekly slot; repeated strength sessions rotate their development blocks.
@@ -784,12 +891,16 @@ export function generatePlan(input: {
     }
   }
 
+  const rationale = explainSessions({ kinds, priorities, roles, ctx, runMinutes, speedPossible });
+
   const plan: PlanDraft = {
     templateVersion: TEMPLATE_VERSION,
     baseline,
     preferences: prefs,
     analysis,
+    standardSummary,
     focusSummary: summary,
+    rationale,
     limitations: Array.from(ctx.limitations),
     scheduleNotes: notes,
     assumptions: Array.from(ctx.assumptions),

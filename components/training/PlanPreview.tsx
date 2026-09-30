@@ -2,7 +2,7 @@
 
 import { Info } from "lucide-react";
 import { aftEventInfo } from "@/lib/aft/scoring";
-import { formatTestDate } from "@/lib/aft/format";
+import { formatRaw, formatTestDate } from "@/lib/aft/format";
 import { defaultSessionDate, weekdayLabels, SOURCES_FOR_PLAN } from "@/lib/training/engine";
 import type { PlanDraft, PlanSession } from "@/lib/training/types";
 import { Card } from "@/components/ui/Card";
@@ -11,28 +11,62 @@ import { BlockView } from "./PlanParts";
 
 export function FocusCard({ plan }: { plan: PlanDraft }) {
   const { baseline } = plan;
+  const ordered = [...plan.analysis].sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
   return (
-    <Card title="Baseline and focus" description={`Baseline test from ${formatTestDate(baseline.testDate)} (a saved copy).`}>
+    <Card title="Your baseline and what the plan focuses on" description={`Baseline test from ${formatTestDate(baseline.testDate)} (a saved copy).`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-2xl font-semibold text-ink">{baseline.result.total}</span>
         <span className="text-sm text-ink-2">/ 500</span>
         <PassFailBadge passed={baseline.result.passed} />
       </div>
-      <ul className="mt-4 space-y-2 text-sm">
-        {plan.analysis.map((a) => (
-          <li key={a.event} className="flex gap-2">
-            <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${a.role === "develop" ? "bg-accent/15 text-accent" : "bg-surface-2 text-ink-2"}`}>
-              {a.role === "develop" ? "Focus" : "Maintain"}
-            </span>
-            <span className="text-ink">{a.reason}</span>
-          </li>
-        ))}
-      </ul>
-      <ul className="mt-4 space-y-1 text-xs text-ink-2">
+      {plan.standardSummary && <p className="mt-2 text-sm text-ink-2">{plan.standardSummary}</p>}
+
+      <div className="relative mt-4 overflow-x-auto">
+        <table className="w-full min-w-[420px] text-left text-sm">
+          <caption className="sr-only">Baseline event breakdown</caption>
+          <thead className="text-xs text-ink-2">
+            <tr>
+              <th className="py-1.5 pr-3 font-medium">Event</th>
+              <th className="py-1.5 pr-3 text-right font-medium">Result</th>
+              <th className="py-1.5 pr-3 text-right font-medium">Points</th>
+              <th className="py-1.5 pr-3 font-medium">Standard</th>
+              <th className="py-1.5 font-medium">Plan</th>
+            </tr>
+          </thead>
+          <tbody className="tabular-nums">
+            {ordered.map((a) => (
+              <tr key={a.event} className="border-t border-line">
+                <td className="py-2 pr-3 text-ink">{aftEventInfo[a.event].name}</td>
+                <td className="py-2 pr-3 text-right text-ink-2">{formatRaw(a.event, a.raw)}</td>
+                <td className={`py-2 pr-3 text-right font-semibold ${a.passed ? "text-ink" : "text-bad"}`}>{a.points}</td>
+                <td className="py-2 pr-3">{a.passed ? "Met" : <span className="text-bad">Below minimum</span>}</td>
+                <td className="py-2">
+                  <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${a.role === "develop" ? "bg-accent/15 text-accent" : "bg-surface-2 text-ink-2"}`}>
+                    {a.role === "develop" ? `Focus ${a.priority ?? ""}`.trim() : "Maintain"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <ul className="mt-4 space-y-1 text-sm text-ink">
         {plan.focusSummary.map((s) => (
           <li key={s}>{s}</li>
         ))}
       </ul>
+
+      {plan.rationale?.length > 0 && (
+        <>
+          <h3 className="mt-4 text-sm font-semibold text-ink">How this shapes your plan</h3>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink">
+            {plan.rationale.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        </>
+      )}
     </Card>
   );
 }
@@ -110,7 +144,7 @@ export function SessionBody({ session, useBuild }: { session: PlanSession; useBu
 export default function PlanPreview({ plan, startDate }: { plan: PlanDraft; startDate: string }) {
   return (
     <div className="space-y-5">
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2 [&>*]:min-w-0">
         <FocusCard plan={plan} />
         <NotesCard plan={plan} />
       </div>
@@ -124,6 +158,7 @@ export default function PlanPreview({ plan, startDate }: { plan: PlanDraft; star
               <ul className="mt-3 space-y-3">
                 {plan.sessions
                   .filter((s) => s.week === week)
+                  .sort((a, b) => defaultSessionDate(startDate, week, a.weekday).localeCompare(defaultSessionDate(startDate, week, b.weekday)))
                   .map((session) => (
                     <li key={session.id} className="rounded-lg border border-line bg-surface p-3">
                       <details>

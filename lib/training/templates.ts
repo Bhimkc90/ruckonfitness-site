@@ -1,7 +1,7 @@
 import type { ActivityId, RunningVolume } from "./types";
 
 // Version stored with every plan so later template changes never silently rewrite an active plan.
-export const TEMPLATE_VERSION = "starter-4wk-v1-draft (2026-09-30, not professionally reviewed)";
+export const TEMPLATE_VERSION = "starter-4wk-v2-draft (2026-09-30, not professionally reviewed)";
 
 // Citations used by the templates. Page numbers are the printed page numbers.
 export const S = {
@@ -38,6 +38,9 @@ export const S = {
 export const ASSUMPTIONS = {
   focus:
     "Focus: failed events are developed; if none failed, the two lowest-scoring events are developed. Point gaps between events are not a validated way to divide training time.",
+  sessionMix:
+    "Session mix: every week keeps one strength and one aerobic session for maintenance; extra days go to the focus events in priority order (deadlift, push-up, or plank → strength; 2-mile run → running; sprint-drag-carry → speed, then non-sprint SDC skills). With 4+ days a weekly speed session is kept; with 5 days one is a recovery session.",
+  maintenanceRun: "Maintenance runs are capped at 20 minutes; runs for a 2-mile run focus use the full per-run cap.",
   loadedHinge:
     "Loaded hinge: 2 sets (weeks 1–2), then 3 sets (weeks 3–4) of 8–10 reps at RPE 6–7 (3–4 reps in reserve) with 90 seconds' rest. No maximum or percentage-based loads.",
   kettlebellCircuit: "Kettlebell stations: 2 rounds (weeks 1–2), then 3 rounds (weeks 3–4) of 1-minute stations with 60 seconds between rounds.",

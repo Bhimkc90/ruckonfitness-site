@@ -23,6 +23,15 @@ export type Preferences = {
   restrictions: Restriction[];
 };
 
+// What the wizard collects. Answers AFT scores cannot establish (equipment, a place to run, experience,
+// recent running) start unanswered (null) and must be answered before a plan is generated.
+export type PreferenceAnswers = Omit<Preferences, "equipment" | "runningAccess" | "experience" | "recentRunning"> & {
+  equipment: EquipmentOption[] | null;
+  runningAccess: boolean | null;
+  experience: Experience | null;
+  recentRunning: RunningVolume | null;
+};
+
 export type Screening = {
   // Pain that currently limits exercise, or being told not to train.
   currentPain: boolean | null;
@@ -45,6 +54,8 @@ export type EventAnalysis = {
   raw: number;
   passed: boolean;
   role: EventRole;
+  // 1 = highest development priority; null for maintained events.
+  priority: number | null;
   reason: string;
 };
 
@@ -95,7 +106,11 @@ export type PlanDraft = {
   baseline: BaselineSnapshot;
   preferences: Preferences;
   analysis: EventAnalysis[];
+  // Scoring category and the pass/fail rule that applies to the baseline.
+  standardSummary: string;
   focusSummary: string[];
+  // How the findings changed the sessions.
+  rationale: string[];
   limitations: string[];
   scheduleNotes: string[];
   assumptions: string[];

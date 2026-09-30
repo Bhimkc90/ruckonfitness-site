@@ -14,7 +14,6 @@ import {
   hasActiveFilters,
   positions,
   sources,
-  workoutTemplates,
 } from "./index";
 import type { LibraryFilters } from "./index";
 
@@ -54,7 +53,7 @@ const kebab = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 describe("IDs and references", () => {
   it("uses unique, stable kebab-case IDs", () => {
-    const ids = [...exercises.map((e) => e.id), ...drills.map((d) => d.id), ...workoutTemplates.map((t) => t.id)];
+    const ids = [...exercises.map((e) => e.id), ...drills.map((d) => d.id)];
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) expect(id).toMatch(kebab);
   });
@@ -113,16 +112,10 @@ describe("IDs and references", () => {
     }
   });
 
-  it("references only existing drills and exercises in workout templates", () => {
-    for (const template of workoutTemplates) {
-      expect(template.origin).toBe("ruckon-suggestion");
-      for (const block of template.blocks) {
-        for (const item of block.items) {
-          if (item.kind === "drill") expect(getDrill(item.drillId)).toBeDefined();
-          else expect(getExercise(item.exerciseId)).toBeDefined();
-        }
-      }
-    }
+  it("excludes suggested workout templates from the library", async () => {
+    const library = await import("./index");
+    expect(Object.keys(library)).not.toContain("workoutTemplates");
+    expect(JSON.stringify({ drills, exercises })).not.toMatch(/ruckon-suggestion/);
   });
 });
 
@@ -131,7 +124,6 @@ describe("content and source coverage", () => {
     ...exercises.flatMap((e) => e.executions.map((x) => x.source)),
     ...drills.flatMap((d) => [...d.sources, d.officialPrescription.source, ...d.officialGuidance.map((g) => g.source)]),
     ...Object.values(positions).flatMap((p) => (p.source ? [p.source] : [])),
-    ...workoutTemplates.flatMap((t) => t.basis.map((b) => b.source)),
   ];
 
   it("cites a known source with paragraph and page for every entry", () => {

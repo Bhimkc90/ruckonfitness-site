@@ -182,17 +182,3 @@ export type Drill = {
   sources: SourceRef[];
   verification: { status: "verified"; checkedOn: string };
 };
-
-export type TemplateBlock =
-  | { kind: "drill"; drillId: DrillId; prescription: string }
-  | { kind: "exercise"; exerciseId: string; prescription: string };
-
-// App suggestions assembled from official drills; never presented as Army prescriptions.
-export type WorkoutTemplate = {
-  id: string;
-  name: string;
-  description: string;
-  origin: "ruckon-suggestion";
-  blocks: { phase: Phase; items: TemplateBlock[] }[];
-  basis: { text: string; source: SourceRef }[];
-};

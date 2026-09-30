@@ -4,9 +4,9 @@ import { preparationExercises } from "./exercises-preparation";
 import { conditioningExercises } from "./exercises-conditioning";
 import { recoveryExercises } from "./exercises-recovery";
 import { fourForTheCoreExercises, loadedExercises, militaryMovementExercises } from "./exercises-additional";
-import { drills, workoutTemplates } from "./drills";
+import { drills } from "./drills";
 
-export { drills, workoutTemplates };
+export { drills };
 export { sources, positions, formatSourceRef } from "./sources";
 
 export const exercises: Exercise[] = [

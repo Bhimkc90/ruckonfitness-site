@@ -193,7 +193,7 @@ function ActivePlan({ plan, completions, today }: { plan: StoredPlan; completion
         );
       })}
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2 [&>*]:min-w-0">
         <FocusCard plan={plan} />
         <NotesCard plan={plan} />
       </div>

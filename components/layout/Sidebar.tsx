@@ -22,12 +22,12 @@ const primaryItems = [
   { name: "AFT Guide", icon: ClipboardList, href: "/aft-guide" },
   { name: "History", icon: History, href: "/score-history" },
   { name: "Library", icon: BookOpen, href: "/workouts" },
-  ...(TRAINING_PLANS_ENABLED ? [{ name: "Training plan", icon: Dumbbell, href: "/training-plan" }] : []),
+  ...(TRAINING_PLANS_ENABLED ? [{ name: "Training plans", icon: Dumbbell, href: "/training-plan" }] : []),
 ];
 
 // Placeholder pages that exist but have no features yet (training plans until the release flag is on).
 const comingSoonItems = [
-  ...(TRAINING_PLANS_ENABLED ? [] : [{ name: "Training plan", icon: Dumbbell, href: "/training-plan" }]),
+  ...(TRAINING_PLANS_ENABLED ? [] : [{ name: "Training plans", icon: Dumbbell, href: "/training-plan" }]),
   { name: "Profile", icon: User, href: "/profile" },
   { name: "Settings", icon: Settings, href: "/settings" },
 ];

@@ -18,7 +18,7 @@ into a plan for any self-selected user are RuckOn assumptions. They need review 
 professional, such as an H2F strength and conditioning coach or athletic trainer, with physical therapy
 input for the screening items.
 
-Template version: `starter-4wk-v1-draft` (`lib/training/templates.ts`, `TEMPLATE_VERSION`).
+Template version: `starter-4wk-v2-draft` (`lib/training/templates.ts`, `TEMPLATE_VERSION`).
 
 ## Items to review
 
@@ -27,6 +27,8 @@ Each item is in `ASSUMPTIONS` in `lib/training/templates.ts` and is shown to use
 | # | Area | Current rule | Question for the reviewer |
 |---|------|--------------|---------------------------|
 | 1 | Focus | Failed events are developed; otherwise the two lowest-scoring events (ties included, balanced when more than three tie or all score 100). | Is ordering emphasis by points appropriate, and is two the right number? |
+| 1a | Session mix | Each week keeps one strength and one aerobic session; extra days go to focus events in priority order (deadlift/push-up/plank → strength, 2-mile run → running, SDC → speed, then a non-sprint SDC skills session). With 4+ days a weekly speed session is kept; with 5 days one is recovery. Two-day plans are strength plus running (or speed when the SDC is the top priority). | Is this allocation sensible for each weakness profile, and should any profile get a different mix? |
+| 1b | Maintenance running | Runs for a maintained 2-mile run are capped at 20 minutes; a 2-mile run focus uses the full per-run cap for the reported range. | Is 20 minutes an appropriate maintenance ceiling? |
 | 2 | Loaded hinge (barbell, hex bar, dumbbells) | 2 sets (weeks 1–2), then 3 sets (weeks 3–4) × 8–10 reps (10–12 with dumbbells) at RPE 6–7 (3–4 reps in reserve), 90 s rest. No maximum or percentage loads. | Are the volume, effort, and rest suitable for untrained and trained users with no coaching? |
 | 3 | Kettlebell stations | Strength Training Circuit stations 1–2 (Sumo Squat, Straight-Leg Deadlift): 2 rounds, then 3 rounds of 1 minute, 60 s between rounds. | Is the progression suitable? The ATP lets Soldiers adjust the weight but gives no starting load. |
 | 4 | HRP practice | 3 sets (weeks 1–2), then 4 sets of about half the baseline reps (clamped to 5–25; half of any baseline under 10), 60–90 s rest, RPE 6–7. | Is submaximal practice at half the baseline safe and useful? |
@@ -52,6 +54,10 @@ These come directly from Army publications and are cited in the app:
 - Load, repetition, and rest ranges (FM 7-22 Table 6-4) and the RPE scale (Table 6-3).
 - Weekly features such as alternating strength and endurance days and weekly speed running (ATP 7-22.02 para 1-24).
 - Remote Soldier schedule features and equipment (FM 7-22 para 14-59 – 14-60, Table 14-20).
+
+## Personalization inputs
+
+The plan uses the selected AFT result's raw results, points, scoring category, and pass/fail rule, together with the user's days, session length, equipment, experience, recent running, movement restrictions, and optional AFT date and target score. Equipment, a place to run, experience, and recent running must be answered explicitly because AFT scores can't establish them.
 
 ## Not included
 

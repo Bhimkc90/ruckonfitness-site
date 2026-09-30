@@ -15,7 +15,7 @@ import type {
   EquipmentOption,
   Experience,
   PlanOutcome,
-  Preferences,
+  PreferenceAnswers,
   Restriction,
   RunningVolume,
   Screening,
@@ -60,14 +60,15 @@ const restrictionOptions: { value: Restriction; label: string }[] = [
   { value: "no-weight-on-hands", label: "Putting weight on my hands (push-ups, hands-and-knees positions)" },
 ];
 
-const initialPrefs: Preferences = {
+// Answers the AFT score cannot establish start unanswered so the user has to choose them.
+const initialPrefs: PreferenceAnswers = {
   daysPerWeek: 3,
   weekdays: ["mon", "wed", "fri"],
   sessionMinutes: 45,
-  equipment: [],
-  runningAccess: false,
-  experience: "some",
-  recentRunning: "none",
+  equipment: null,
+  runningAccess: null,
+  experience: null,
+  recentRunning: null,
   restrictions: [],
 };
 
@@ -84,7 +85,7 @@ export default function PlanWizard() {
   const [step, setStep] = useState<Step>("baseline");
   const [baselineId, setBaselineId] = useState<string | null>(null);
   const [screening, setScreening] = useState<Screening>({ currentPain: null, otherInstructions: "" });
-  const [prefs, setPrefs] = useState<Preferences>(initialPrefs);
+  const [prefs, setPrefs] = useState<PreferenceAnswers>(initialPrefs);
   const [aftDate, setAftDate] = useState("");
   const [target, setTarget] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -107,7 +108,7 @@ export default function PlanWizard() {
   const selectedId = baselineId ?? (saved.some((r) => r.id === requested) ? requested! : saved[0].id);
   const selected = saved.find((r) => r.id === selectedId) ?? saved[0];
   const start = startDate || today;
-  const fullPrefs: Preferences = {
+  const fullPrefs: PreferenceAnswers = {
     ...prefs,
     ...(aftDate ? { nextAftDate: aftDate } : {}),
     ...(target.trim() !== "" ? { targetScore: Number(target) } : {}),
@@ -120,7 +121,7 @@ export default function PlanWizard() {
   });
   const existing = activePlan(training);
 
-  const set = <K extends keyof Preferences>(key: K, value: Preferences[K]) => setPrefs((p) => ({ ...p, [key]: value }));
+  const set = <K extends keyof PreferenceAnswers>(key: K, value: PreferenceAnswers[K]) => setPrefs((p) => ({ ...p, [key]: value }));
   const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
   const handleStart = () => {
@@ -277,22 +278,52 @@ export default function PlanWizard() {
               </div>
             </fieldset>
             <fieldset className="text-sm">
-              <legend className="text-ink-2">Equipment you can use</legend>
+              <legend className="text-ink-2">
+                Equipment you can use <Required show={prefs.equipment === null} />
+              </legend>
               <div className="mt-2 space-y-1.5">
                 {equipmentOptions.map((o) => (
                   <label key={o.value} className="flex items-center gap-2">
-                    <input type="checkbox" checked={prefs.equipment.includes(o.value)} onChange={() => set("equipment", toggle(prefs.equipment, o.value))} className="accent-[var(--color-accent)]" />
+                    <input
+                      type="checkbox"
+                      checked={!!prefs.equipment?.includes(o.value)}
+                      onChange={() => set("equipment", toggle(prefs.equipment ?? [], o.value))}
+                      className="accent-[var(--color-accent)]"
+                    />
                     {o.label}
                   </label>
                 ))}
                 <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={prefs.runningAccess} onChange={() => set("runningAccess", !prefs.runningAccess)} className="accent-[var(--color-accent)]" />
-                  A safe place to run (track or measured route)
+                  <input
+                    type="checkbox"
+                    checked={prefs.equipment !== null && prefs.equipment.length === 0}
+                    onChange={() => set("equipment", prefs.equipment !== null && prefs.equipment.length === 0 ? null : [])}
+                    className="accent-[var(--color-accent)]"
+                  />
+                  No equipment
                 </label>
               </div>
             </fieldset>
             <fieldset className="text-sm">
-              <legend className="text-ink-2">Current training experience</legend>
+              <legend className="text-ink-2">
+                Do you have a safe place to run (track or measured route)? <Required show={prefs.runningAccess === null} />
+              </legend>
+              <div className="mt-2 flex gap-4">
+                {[
+                  ["Yes", true],
+                  ["No", false],
+                ].map(([label, value]) => (
+                  <label key={String(label)} className="flex items-center gap-2">
+                    <input type="radio" name="running-access" checked={prefs.runningAccess === value} onChange={() => set("runningAccess", value as boolean)} className="accent-[var(--color-accent)]" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset className="text-sm">
+              <legend className="text-ink-2">
+                Current training experience <Required show={prefs.experience === null} />
+              </legend>
               <div className="mt-2 space-y-1.5">
                 {experienceOptions.map((o) => (
                   <label key={o.value} className="flex items-start gap-2">
@@ -306,8 +337,15 @@ export default function PlanWizard() {
               </div>
             </fieldset>
             <label className="block text-sm">
-              <span className="text-ink-2">Running in the last 4 weeks, on average</span>
-              <select value={prefs.recentRunning} onChange={(e) => set("recentRunning", e.target.value as RunningVolume)} className={inputClass}>
+              <span className="text-ink-2">
+                Running in the last 4 weeks, on average <Required show={prefs.recentRunning === null} />
+              </span>
+              <select
+                value={prefs.recentRunning ?? ""}
+                onChange={(e) => set("recentRunning", e.target.value ? (e.target.value as RunningVolume) : null)}
+                className={inputClass}
+              >
+                <option value="">Choose</option>
                 {runningOptions.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
@@ -417,6 +455,11 @@ export default function PlanWizard() {
       </p>
     </div>
   );
+}
+
+function Required({ show }: { show: boolean }) {
+  if (!show) return null;
+  return <span className="ml-1 text-xs font-medium text-accent">Required</span>;
 }
 
 function StepButtons({ back, next, disabled, nextLabel = "Continue" }: { back?: () => void; next?: () => void; disabled?: boolean; nextLabel?: string }) {

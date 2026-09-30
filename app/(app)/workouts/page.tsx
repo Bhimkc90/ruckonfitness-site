@@ -1,25 +1,24 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import LibraryBrowser from "@/components/library/LibraryBrowser";
 import { LegendNote, SourceList } from "@/components/library/LibraryBits";
 import { Card, PageHeader } from "@/components/ui/Card";
-import { drillHref, getDrill, phaseLabels, workoutTemplates } from "@/lib/library";
-import { formatSourceRef } from "@/lib/library";
+import { ButtonLink } from "@/components/ui/Button";
+import { TRAINING_PLANS_ENABLED } from "@/lib/features";
 
 export const metadata: Metadata = {
   title: "Military workout library",
   description:
-    "Army Preparation, Conditioning 1 and 2, and Recovery Drill exercises with official instructions, cadence, and sources.",
+    "Army drills and exercises (Preparation, Four for the Core, Military Movement 1, Conditioning 1 and 2, Recovery, and free-weight lifts) with official instructions, cadence, and sources.",
 };
 
+// The library holds reusable exercise instructions and official drill sequences only.
+// Suggested workouts, schedules, and progression live in Training Plans.
 export default function WorkoutLibraryPage() {
-  const template = workoutTemplates[0];
-
   return (
     <div className="space-y-6">
       <PageHeader
         title="Military workout library"
-        description="Exercises and drills from the Army's current H2F drill manual, with step-by-step instructions, official cadence, and page-level sources. Free to use, no account needed."
+        description="Exercises and official drills from the Army's current H2F drill manual, with step-by-step instructions, official cadence, and page-level sources. Free to use, no account needed."
       />
 
       <LegendNote />
@@ -27,41 +26,17 @@ export default function WorkoutLibraryPage() {
       <LibraryBrowser />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card
-          title={template.name}
-          description={
-            <>
-              <span className="font-medium text-ink">RuckOn suggestion, not an Army-prescribed session.</span>{" "}
-              {template.description}
-            </>
-          }
-        >
-          <ol className="space-y-2 text-sm">
-            {template.blocks.flatMap((block) =>
-              block.items.map((item) => {
-                if (item.kind !== "drill") return null;
-                const drill = getDrill(item.drillId)!;
-                return (
-                  <li key={`${block.phase}-${drill.id}`} className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span>
-                      <span className="text-ink-2">{phaseLabels[block.phase]}: </span>
-                      <Link href={drillHref(drill.id)} className="font-medium text-accent hover:underline">
-                        {drill.name}
-                      </Link>
-                    </span>
-                    <span className="text-xs text-ink-2">{item.prescription}</span>
-                  </li>
-                );
-              })
-            )}
-          </ol>
-          <ul className="mt-4 space-y-1 text-xs text-ink-2">
-            {template.basis.map((basis) => (
-              <li key={basis.text}>
-                Based on: {basis.text} ({formatSourceRef(basis.source)})
-              </li>
-            ))}
-          </ul>
+        <Card title="Suggested workouts">
+          <p className="text-sm text-ink-2">
+            {TRAINING_PLANS_ENABLED
+              ? "Suggested sessions, weekly schedules, and progress tracking built from your AFT results are in Training plans. They link back to these instructions."
+              : "Suggested sessions built from your AFT results will live in Training plans once they have been professionally reviewed. The library contains exercise instructions and official drills only."}
+          </p>
+          {TRAINING_PLANS_ENABLED && (
+            <ButtonLink href="/training-plan" className="mt-4">
+              Open training plans
+            </ButtonLink>
+          )}
         </Card>
 
         <Card

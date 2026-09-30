@@ -349,3 +349,116 @@ describe("storage and completion", () => {
     expect(progressionHeld(activePlan(pain)!, pain.completions, 4)).toBe(true);
   });
 });
+
+describe("personalization changes the plan", () => {
+  // Each profile fails one event (general standard, 25-year-old male) and passes the rest.
+  const runWeak = baseline({ "2MR": t(24, 0) });
+  const liftWeak = baseline({ MDL: 120 });
+  const sdcWeak = baseline({ SDC: t(3, 0) });
+  const kindsOf = (plan: PlanDraft) => plan.sessions.filter((s) => s.week === 1).map((s) => s.kind);
+  const count = (plan: PlanDraft, kind: string) => kindsOf(plan).filter((k) => k === kind).length;
+
+  it("confirms each profile fails only its intended event", () => {
+    for (const [b, event] of [[runWeak, "2MR"], [liftWeak, "MDL"], [sdcWeak, "SDC"]] as const) {
+      expect(b.result.events.filter((e) => e.points < 60).map((e) => e.event)).toEqual([event]);
+    }
+  });
+
+  it("gives run, deadlift, and SDC weaknesses different weekly session mixes", () => {
+    for (const days of [3, 4, 5] as const) {
+      const weekdays = (["mon", "wed", "fri", "sat", "sun"] as const).slice(0, days);
+      const p = prefs({ daysPerWeek: days, weekdays: [...weekdays] });
+      const run = ready(p, runWeak);
+      const lift = ready(p, liftWeak);
+      const sdc = ready(p, sdcWeak);
+      expect(count(run, "endurance"), `${days}d run`).toBeGreaterThanOrEqual(2);
+      expect(count(lift, "strength"), `${days}d lift`).toBeGreaterThanOrEqual(2);
+      expect(count(lift, "endurance")).toBe(1);
+      expect(count(run, "strength")).toBe(1);
+      expect(count(sdc, "speed") + count(sdc, "conditioning"), `${days}d sdc`).toBeGreaterThanOrEqual(days >= 4 ? 2 : 1);
+      const mixes = new Set([run, lift, sdc].map((plan) => [...kindsOf(plan)].sort().join(",")));
+      expect(mixes.size, `${days}d mixes`).toBe(3);
+    }
+  });
+
+  it("changes session content, not just titles", () => {
+    const p = prefs({ equipment: ["barbell-or-hex-bar"], recentRunning: "61-120" });
+    const lift = ready(p, liftWeak);
+    const run = ready(p, runWeak);
+    const liftStrength = lift.sessions.find((s) => s.kind === "strength")!;
+    expect(liftStrength.main[0].id).toBe("mdl-deadlift");
+    expect(liftStrength.main[0].title).toMatch(/development/);
+    const runStrength = run.sessions.find((s) => s.kind === "strength")!;
+    expect(runStrength.main.find((b) => b.id.startsWith("mdl"))!.title).toMatch(/maintenance/);
+    const runLength = (plan: PlanDraft) => {
+      const item = plan.sessions.find((s) => s.kind === "endurance")!.main[0].items[0];
+      return item.kind === "activity" ? parseInt(item.prescription.foundation.time!) : 0;
+    };
+    expect(runLength(run)).toBeGreaterThan(runLength(lift));
+  });
+
+  it("keeps maintenance work for stronger events", () => {
+    const lift = ready(prefs(), liftWeak);
+    expect(kindsOf(lift)).toContain("endurance"); // the 2-mile run is maintained
+    const hrpPlk = lift.sessions.find((s) => s.kind === "strength")!.main.map((b) => b.id);
+    expect(hrpPlk).toEqual(expect.arrayContaining(["hrp-maintain", "plk-maintain"]));
+    const run = ready(prefs(), runWeak);
+    expect(kindsOf(run)).toContain("strength");
+    expect(run.analysis.filter((a) => a.role === "maintain").map((a) => a.event)).toEqual(["MDL", "HRP", "SDC", "PLK"]);
+  });
+
+  it("explains failed events, priorities, maintenance, and how the sessions changed", () => {
+    const plan = ready(prefs(), baseline({ HRP: 5, "2MR": t(24, 0) }));
+    expect(plan.standardSummary).toMatch(/General · 22-26 · Male \| Combat.*at least 60 points on every event/);
+    expect(plan.focusSummary.join(" ")).toMatch(/Failed the general standard: .*2-Mile Run|Failed the general standard: .*Hand-Release Push-Up/);
+    expect(plan.focusSummary.join(" ")).toMatch(/Maintained: /);
+    expect(plan.analysis.find((a) => a.priority === 1)).toBeDefined();
+    expect(plan.rationale.join(" ")).toMatch(/2-mile run focus: \d of your 3 weekly sessions/);
+    expect(plan.rationale.join(" ")).toMatch(/Push-Ups focus|Push-Ups and/);
+    expect(plan.rationale.join(" ")).toMatch(/Stronger events/);
+  });
+
+  it("responds to schedule, experience, duration, equipment, and restrictions", () => {
+    const b = sdcWeak;
+    expect(ready(prefs({ daysPerWeek: 2, weekdays: ["mon", "thu"] }), b).sessions).toHaveLength(8);
+    const reps = (plan: PlanDraft) => {
+      const item = allItems(plan).find((i) => i.kind === "activity" && i.activityId === "intervals-30-60");
+      return item ? item.prescription.build.reps : undefined;
+    };
+    expect(reps(ready(prefs({ experience: "new" }), b))).toBe("4 repeats");
+    expect(reps(ready(prefs({ experience: "regular" }), b))).toBe("6 repeats");
+    expect(ready(prefs({ sessionMinutes: 30 }), b).sessions[0].warmUp[0].id).toBe("pd-condensed");
+    expect(usedExercises(ready(prefs({ equipment: ["kettlebell"] }), liftWeak))).toContain("sumo-squat");
+    expect(activities(ready(prefs({ restrictions: ["no-running"] }), b))).not.toContain("intervals-30-60");
+  });
+
+  it("keeps a balanced mix when no event stands out", () => {
+    const even = baseline({ MDL: 350, HRP: 70, SDC: t(1, 20), PLK: t(4, 0), "2MR": t(13, 0) });
+    const plan = ready(prefs(), even);
+    expect(plan.analysis.every((a) => a.role === "maintain")).toBe(true);
+    expect([...kindsOf(plan)].sort()).toEqual(["endurance", "speed", "strength"]);
+  });
+});
+
+describe("missing preferences", () => {
+  it("asks for answers AFT scores cannot establish", () => {
+    const outcome = generatePlan({
+      baseline: baseline(),
+      prefs: { ...prefs(), equipment: null, runningAccess: null, experience: null, recentRunning: null },
+      screening: ok,
+      startDate: START,
+    });
+    expect(outcome.status).toBe("invalid");
+    if (outcome.status === "invalid") {
+      expect(outcome.errors).toHaveLength(4);
+      expect(outcome.errors.join(" ")).toMatch(/equipment/);
+      expect(outcome.errors.join(" ")).toMatch(/place to run/);
+      expect(outcome.errors.join(" ")).toMatch(/training experience/);
+      expect(outcome.errors.join(" ")).toMatch(/how much you have run/);
+    }
+  });
+
+  it("accepts an explicit no-equipment answer", () => {
+    expect(generatePlan({ baseline: baseline(), prefs: prefs({ equipment: [] }), screening: ok, startDate: START }).status).toBe("ready");
+  });
+});
