@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Citation, LegendNote, SourceList, SourceNote, Tag } from "@/components/library/LibraryBits";
+import FigureGallery from "@/components/library/FigureGallery";
+import { figuresFor } from "@/lib/library/images";
 import {
   aftEventLabels,
   cadenceLabels,
@@ -67,6 +69,8 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <div className="space-y-6">
+          <FigureGallery exercise={exercise} />
+
           {exercise.executions.map((execution) => {
             const drill = execution.drillId ? getDrill(execution.drillId) : undefined;
             const index = drill ? drill.sequence.indexOf(exercise.id) : -1;
@@ -271,8 +275,9 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
           <Card title="Sources">
             <SourceList ids={sourceIds} />
             <p className="mt-3 text-xs text-ink-2">
-              No demonstration video is linked: the ATP points to the Central Army Registry and army.mil/aft rather than a
-              video for this exercise.
+              {figuresFor(exercise.id).length > 0
+                ? "Photos are the ATP's own figures. No demonstration video is linked: the ATP points to the Central Army Registry and army.mil/aft rather than a video for this exercise."
+                : "No demonstration video is linked: the ATP points to the Central Army Registry and army.mil/aft rather than a video for this exercise."}
             </p>
           </Card>
 

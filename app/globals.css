@@ -13,6 +13,16 @@
   --color-ink-2: #b4b4bc;
   --color-good: #4ade80;
   --color-bad: #f87171;
+
+  /* Library cards sit clearly above the page. */
+  --color-card: #26282e;
+  --color-card-hover: #2d3037;
+  --color-card-line: #3f434c;
+
+  /* Restrained drill-category accents (always paired with a text label). */
+  --color-prep: #5eead4;
+  --color-activity: #fdba74;
+  --color-recovery: #a5b4fc;
 }
 
 @theme inline {

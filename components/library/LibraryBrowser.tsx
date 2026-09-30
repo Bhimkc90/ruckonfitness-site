@@ -22,6 +22,9 @@ import {
 import { CATEGORY_NOTE, filterSections, librarySections, matchingExerciseCount, type LibrarySection } from "@/lib/library/sections";
 import { buttonClass } from "@/components/ui/Button";
 import { Tag } from "./LibraryBits";
+import { accents } from "./accents";
+import { ExerciseThumb } from "./ExerciseImage";
+import { thumbnailFor } from "@/lib/library/images";
 
 const SECTIONS = librarySections();
 
@@ -65,7 +68,7 @@ export default function LibraryBrowser() {
       </nav>
 
       {/* Search and filters */}
-      <section aria-label="Search and filters" className="rounded-xl border border-line bg-surface/60 p-3 sm:p-4">
+      <section aria-label="Search and filters" className="rounded-xl border border-card-line bg-card p-3 sm:p-4">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-[minmax(0,2fr)_repeat(5,minmax(0,1fr))] md:items-end">
           <label className="col-span-2 block text-xs md:col-span-1">
             <span className="text-ink-2">Search</span>
@@ -164,8 +167,9 @@ function JumpLinks({ label, items }: { label: string; items: { section: LibraryS
         <a
           key={section.id}
           href={`#${section.id}`}
-          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-sm text-ink hover:border-accent/60"
+          className="inline-flex items-center gap-1.5 rounded-full border border-card-line bg-card px-3 py-1 text-sm text-ink hover:border-accent/60"
         >
+          <span className={`h-2 w-2 rounded-full ${sectionAccent(section).bar}`} aria-hidden />
           {section.title}
           <span className="text-xs tabular-nums text-ink-2">{shown.length}</span>
         </a>
@@ -214,28 +218,32 @@ function ActiveChip({ label, onRemove }: { label: string; onRemove: () => void }
   );
 }
 
+function sectionAccent(section: LibrarySection) {
+  return accents[section.kind === "drill" ? section.drill.officialCategory : "app"];
+}
+
 function SectionBlock({ section, shown, filtered }: { section: LibrarySection; shown: Exercise[]; filtered: boolean }) {
   const total = section.exerciseIds.length;
   const headingId = `${section.id}-heading`;
+  const accent = sectionAccent(section);
   return (
     <section id={section.id} aria-labelledby={headingId} className="scroll-mt-28">
-      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-3">
-        <div className="min-w-0 max-w-3xl">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {section.kind === "drill" ? (
-              <>
-                <Tag tone="official">{section.drill.officialCategory}</Tag>
-                <Tag tone="official">{section.drill.officialComponent}</Tag>
-              </>
-            ) : (
-              <Tag>{CATEGORY_NOTE}</Tag>
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-card-line pb-4">
+        <div className="flex min-w-0 max-w-3xl gap-3">
+          <span className={`mt-1 w-1 shrink-0 self-stretch rounded-full ${accent.bar}`} aria-hidden />
+          <div className="min-w-0">
+            <p className={`text-xs font-semibold uppercase tracking-wider ${accent.text}`}>
+              {section.kind === "drill" ? `${accent.label} · ${section.drill.officialCategory} (Army)` : CATEGORY_NOTE}
+            </p>
+            <h2 id={headingId} className="mt-1 text-2xl font-semibold tracking-tight text-ink">
+              {section.title}
+              {section.kind === "drill" && <span className="ml-2 text-lg font-normal text-ink-2">({section.drill.abbreviation})</span>}
+            </h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-ink-2">{section.description}</p>
+            {section.kind === "drill" && (
+              <p className="mt-2 text-xs text-ink-2">Physical component (Army): {section.drill.officialComponent}</p>
             )}
           </div>
-          <h2 id={headingId} className="mt-2 text-xl font-semibold tracking-tight text-ink">
-            {section.title}
-            {section.kind === "drill" && <span className="ml-2 text-base font-normal text-ink-2">({section.drill.abbreviation})</span>}
-          </h2>
-          <p className="mt-1 text-sm text-ink-2">{section.description}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className="text-ink-2">
@@ -243,7 +251,7 @@ function SectionBlock({ section, shown, filtered }: { section: LibrarySection; s
             {section.kind === "drill" && ", official order"}
           </span>
           {section.kind === "drill" && (
-            <Link href={drillHref(section.drill.id)} className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
+            <Link href={drillHref(section.drill.id)} className={buttonClass("primary", "px-3 py-1.5")}>
               View full drill
               <ArrowRight className="h-3.5 w-3.5" aria-hidden />
               <span className="sr-only">: {section.title}</span>
@@ -252,7 +260,7 @@ function SectionBlock({ section, shown, filtered }: { section: LibrarySection; s
         </div>
       </header>
 
-      <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <ul className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {shown.map((exercise) => (
           <li key={exercise.id}>
             <ExerciseCard exercise={exercise} section={section} />
@@ -267,40 +275,52 @@ function ExerciseCard({ exercise, section }: { exercise: Exercise; section: Libr
   const order = section.kind === "drill" ? section.exerciseIds.indexOf(exercise.id) + 1 : null;
   const otherDrills = drillMemberships(exercise.id).filter(({ drill }) => drill.id !== section.id);
   const context = section.kind === "category" ? exercise.executions.find((e) => e.context)?.context : undefined;
+  const accent = sectionAccent(section);
+  const abbreviation = section.kind === "drill" ? section.drill.abbreviation : undefined;
+  const figure = thumbnailFor(exercise.id, abbreviation);
   return (
     <Link
       href={exerciseHref(exercise.id)}
-      className="group flex h-full flex-col rounded-xl border border-line bg-surface p-4 transition-colors hover:border-line-strong hover:bg-surface-2/60"
+      className={`group flex h-full flex-col rounded-xl border border-t-2 border-card-line bg-card shadow-sm shadow-black/30 transition-colors hover:bg-card-hover ${accent.border} ${accent.hoverBorder}`}
     >
-      <div className="flex items-start gap-3">
-        {order !== null && (
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold tabular-nums text-ink" aria-label={`Exercise ${order} of ${section.exerciseIds.length}`}>
-            {order}
-          </span>
-        )}
-        <div className="min-w-0">
-          <h3 className="font-semibold text-ink">{exercise.name}</h3>
-          {context && <p className="text-xs text-ink-2">{context}</p>}
+      <ExerciseThumb exercise={exercise} drillAbbreviation={abbreviation} sizes="(min-width: 1280px) 340px, (min-width: 640px) 45vw, 92vw" />
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex items-start gap-3">
+          {order !== null && (
+            <span
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold tabular-nums ${accent.soft}`}
+              aria-label={`Exercise ${order} of ${section.exerciseIds.length}`}
+            >
+              {order}
+            </span>
+          )}
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold leading-snug text-ink">{exercise.name}</h3>
+            {context && <p className="text-xs text-ink-2">{context}</p>}
+          </div>
         </div>
-      </div>
-      <p className="mt-2 line-clamp-3 text-sm text-ink-2">{exercise.summary}</p>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {exercise.tags.purposes.slice(0, 2).map((purpose) => (
-          <Tag key={purpose}>{purposeLabels[purpose]}</Tag>
-        ))}
-        {exercise.tags.impact === "jumping" && <Tag>Includes jumping</Tag>}
-        {otherDrills.map(({ drill, order: n }) => (
-          <Tag key={drill.id} tone="official">
-            Also {drill.abbreviation} #{n}
-          </Tag>
-        ))}
-      </div>
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3 text-xs">
-        <span className="text-ink-2">{exercise.tags.equipment.map((e) => equipmentLabels[e]).join(", ")}</span>
-        <span className="inline-flex items-center gap-1 font-medium text-accent group-hover:underline">
-          Instructions
-          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-        </span>
+        <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-ink-2">{exercise.summary}</p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {exercise.tags.purposes.slice(0, 2).map((purpose) => (
+            <Tag key={purpose}>{purposeLabels[purpose]}</Tag>
+          ))}
+          {exercise.tags.impact === "jumping" && <Tag>Includes jumping</Tag>}
+          {otherDrills.map(({ drill, order: n }) => (
+            <Tag key={drill.id} tone="official">
+              Also {drill.abbreviation} #{n}
+            </Tag>
+          ))}
+        </div>
+        <div className="mt-auto border-t border-card-line pt-3 text-xs">
+          <p className="text-ink">{exercise.tags.equipment.map((e) => equipmentLabels[e]).join(", ")}</p>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <span className="text-ink-2">{figure ? `Photo: ATP 7-22.02, fig. ${figure.figure}` : "No photo yet"}</span>
+            <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-accent group-hover:underline">
+              Instructions
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </span>
+          </div>
+        </div>
       </div>
     </Link>
   );
