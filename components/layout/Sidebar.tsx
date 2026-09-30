@@ -4,60 +4,108 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  Backpack,
+  ClipboardPlus,
   Dumbbell,
-  Gauge,
-  Home as HomeIcon,
-  LineChart as LineChartIcon,
+  History,
+  LayoutDashboard,
   Settings,
-  Star,
   User,
 } from "lucide-react";
 
-const navItems = [
-  { name: "Home", icon: HomeIcon, href: "/" },
-  { name: "AFT Calculator", icon: Gauge, href: "/aft-calculator" },
-  { name: "Score History", icon: LineChartIcon, href: "/score-history" },
-  { name: "Training Plan", icon: Dumbbell, href: "/training-plan" },
+const primaryItems = [
+  { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+  { name: "Record AFT", icon: ClipboardPlus, href: "/aft-calculator" },
+  { name: "History", icon: History, href: "/score-history" },
+];
+
+// Placeholder pages that exist but have no features yet.
+const comingSoonItems = [
+  { name: "Training plan", icon: Dumbbell, href: "/training-plan" },
   { name: "Workouts", icon: Activity, href: "/workouts" },
   { name: "Profile", icon: User, href: "/profile" },
   { name: "Settings", icon: Settings, href: "/settings" },
 ];
 
+function Brand() {
+  return (
+    <Link href="/dashboard" className="flex items-center gap-2 rounded-lg">
+      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-black">
+        <Backpack className="h-4 w-4" aria-hidden />
+      </span>
+      <span className="text-sm font-semibold tracking-tight text-ink">RuckOn Fitness</span>
+    </Link>
+  );
+}
+
+function NavLink({
+  item,
+  active,
+  muted = false,
+}: {
+  item: (typeof primaryItems)[number];
+  active: boolean;
+  muted?: boolean;
+}) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors ${
+        active
+          ? "bg-surface-2 font-semibold text-ink shadow-[inset_3px_0_0_var(--color-accent)]"
+          : muted
+            ? "text-ink-2/80 hover:bg-surface-2 hover:text-ink"
+            : "text-ink-2 hover:bg-surface-2 hover:text-ink"
+      }`}
+    >
+      <Icon className={`h-4 w-4 ${active ? "text-accent" : ""}`} aria-hidden />
+      {item.name}
+      {muted && (
+        <span className="ml-auto rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-2">
+          Soon
+        </span>
+      )}
+    </Link>
+  );
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="border-b border-zinc-800 bg-black p-3 lg:border-b-0 lg:border-r lg:p-6">
-      <nav className="flex gap-2 overflow-x-auto lg:block lg:space-y-3">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href;
+    <>
+      {/* Mobile: brand bar with a horizontally scrolling nav row. */}
+      <header className="sticky top-0 z-20 border-b border-line bg-canvas/95 backdrop-blur lg:hidden">
+        <div className="px-4 pt-3">
+          <Brand />
+        </div>
+        <nav aria-label="Main" className="flex gap-1 overflow-x-auto px-3 py-2">
+          {primaryItems.map((item) => (
+            <NavLink key={item.href} item={item} active={pathname === item.href} />
+          ))}
+          {comingSoonItems.map((item) => (
+            <NavLink key={item.href} item={item} active={pathname === item.href} muted />
+          ))}
+        </nav>
+      </header>
 
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-left text-sm font-bold uppercase transition lg:w-full lg:gap-4 lg:px-5 lg:py-4 lg:text-base ${
-                active
-                  ? "bg-yellow-400 text-black"
-                  : "text-zinc-200 hover:bg-zinc-900 hover:text-yellow-400"
-              }`}
-            >
-              <Icon className="h-5 w-5 lg:h-6 lg:w-6" />
-              {item.name}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="mt-24 hidden rounded-2xl border border-yellow-500/50 p-6 text-center lg:block">
-        <h2 className="text-3xl font-black uppercase leading-tight text-yellow-400">
-          Be All <br /> You Can Be.
-        </h2>
-        <p className="mt-4 text-xl font-black uppercase">Army Strong.</p>
-        <Star className="mx-auto mt-5 h-14 w-14 text-yellow-400" />
-      </div>
-    </aside>
+      {/* Desktop: compact fixed sidebar. */}
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-canvas px-3 py-5 lg:flex">
+        <div className="px-2">
+          <Brand />
+        </div>
+        <nav aria-label="Main" className="mt-8 flex flex-col gap-1">
+          {primaryItems.map((item) => (
+            <NavLink key={item.href} item={item} active={pathname === item.href} />
+          ))}
+          <p className="mb-1 mt-6 px-3 text-xs font-medium text-ink-2">Coming soon</p>
+          {comingSoonItems.map((item) => (
+            <NavLink key={item.href} item={item} active={pathname === item.href} muted />
+          ))}
+        </nav>
+      </aside>
+    </>
   );
 }

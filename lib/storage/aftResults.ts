@@ -93,27 +93,56 @@ function write(results: SavedAftResult[]): { ok: true } | { ok: false; error: st
   }
 }
 
-export function saveAftResult(entry: { testDate: string; input: AftInput; result: AftResult }) {
+function sameInput(a: AftInput, b: AftInput): boolean {
+  return (
+    a.age === b.age &&
+    a.standard === b.standard &&
+    a.gender === b.gender &&
+    (Object.keys(a.raw) as (keyof AftInput["raw"])[]).every((event) => a.raw[event] === b.raw[event])
+  );
+}
+
+// An identical test (same date and same entries) that is already saved.
+export function findDuplicate(
+  results: SavedAftResult[],
+  entry: { testDate: string; input: AftInput }
+): SavedAftResult | undefined {
+  return results.find((item) => item.testDate === entry.testDate && sameInput(item.input, entry.input));
+}
+
+export function saveAftResult(entry: { testDate: string; input: AftInput; result: AftResult }):
+  | { ok: true; record: SavedAftResult }
+  | { ok: false; error: string; duplicate?: SavedAftResult } {
+  const duplicate = findDuplicate(getSnapshot(), entry);
+  if (duplicate) {
+    return { ok: false, error: "This test is already saved.", duplicate };
+  }
+
   const record: SavedAftResult = {
     id: crypto.randomUUID(),
     savedAt: new Date().toISOString(),
     scoringVersion: aftScoringFile.fileName,
     ...entry,
   };
-  return write([...getSnapshot(), record]);
+  const written = write([...getSnapshot(), record]);
+  return written.ok ? { ok: true, record } : written;
 }
 
 export function deleteAftResult(id: string) {
   return write(getSnapshot().filter((item) => item.id !== id));
 }
 
-// Oldest first, by test date then save time.
-export function sortByTestDate(results: SavedAftResult[]): SavedAftResult[] {
-  return [...results].sort(
-    (a, b) => a.testDate.localeCompare(b.testDate) || a.savedAt.localeCompare(b.savedAt)
-  );
-}
-
 export function useAftResults(): SavedAftResult[] {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+const noopSubscribe = () => () => {};
+
+// False during server rendering and hydration, true once browser storage can be read.
+export function useHydrated(): boolean {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false
+  );
 }

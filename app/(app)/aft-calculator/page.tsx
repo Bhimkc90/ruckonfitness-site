@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
 import AftCalculator from "@/components/aft/AftCalculator";
+import { PageHeader } from "@/components/ui/Card";
 
-export const metadata: Metadata = { title: "AFT Calculator" };
+export const metadata: Metadata = { title: "Record AFT" };
 
 export default function AftCalculatorPage() {
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-4xl font-black uppercase text-yellow-400">AFT Calculator</h1>
-        <p className="mt-2 text-zinc-400">
-          Enter raw Army Fitness Test results. Points use the official score tables effective 1 June 2025.
-        </p>
-      </div>
+      <PageHeader
+        title="Record AFT"
+        description="Enter raw Army Fitness Test results to see your score from the official tables effective 1 June 2025. Nothing is saved until you choose to save it."
+      />
       <AftCalculator />
     </div>
   );

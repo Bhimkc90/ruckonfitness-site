@@ -1,10 +1,19 @@
+import type { Metadata } from "next";
+import { Card, PageHeader } from "@/components/ui/Card";
+import { ButtonLink } from "@/components/ui/Button";
+
+export const metadata: Metadata = { title: "Profile" };
+
 export default function ProfilePage() {
-    return (
-      <div>
-        <h1 className="text-4xl font-black text-yellow-400">Profile</h1>
-        <p className="mt-4 text-zinc-300">
-          Soldier profile features are currently in development.
-        </p>
-      </div>
-    );
-  }
+  return (
+    <div>
+      <PageHeader title="Profile" />
+      <Card>
+        <p className="text-sm text-ink-2">Soldier profile features are currently in development.</p>
+        <ButtonLink href="/dashboard" variant="secondary" className="mt-4">
+          Back to dashboard
+        </ButtonLink>
+      </Card>
+    </div>
+  );
+}

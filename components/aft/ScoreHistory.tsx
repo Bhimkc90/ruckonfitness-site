@@ -1,119 +1,153 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect } from "react";
+import { ArrowDownRight, ArrowUpRight, Info, Minus, Trash2 } from "lucide-react";
 import { aftEventInfo } from "@/lib/aft/scoring";
 import { aftStandardRules } from "@/lib/aft/rules";
-import {
-  deleteAftResult,
-  sortByTestDate,
-  useAftResults,
-  type SavedAftResult,
-} from "@/lib/storage/aftResults";
-import { formatRaw } from "./AftResultSummary";
+import { buildProgress, categoryOf, testLabel, type TestProgress } from "@/lib/aft/progress";
+import { describeCategory, describeRawChange, formatRaw, formatSignedPoints, formatTestDate } from "@/lib/aft/format";
+import { deleteAftResult, useAftResults, useHydrated } from "@/lib/storage/aftResults";
+import { Card } from "@/components/ui/Card";
+import { ButtonLink } from "@/components/ui/Button";
+import { Chip, PassFailBadge } from "@/components/ui/StatusBadge";
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  year: "numeric",
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-});
-
-function formatTestDate(value: string) {
-  return dateFormatter.format(new Date(`${value}T00:00:00Z`));
-}
-
-function Change({ value }: { value: number | null }) {
-  if (value === null) return <span className="text-zinc-600">—</span>;
-  if (value === 0) return <span className="text-zinc-400">0</span>;
+function PointsChange({ value }: { value: number | null }) {
+  if (value === null) return <span className="text-ink-2">—</span>;
+  const Icon = value > 0 ? ArrowUpRight : value < 0 ? ArrowDownRight : Minus;
+  const tone = value > 0 ? "text-good" : value < 0 ? "text-bad" : "text-ink-2";
   return (
-    <span className={value > 0 ? "text-green-400" : "text-red-400"}>
-      {value > 0 ? `+${value}` : value}
+    <span className={`inline-flex items-center gap-0.5 font-medium ${tone}`}>
+      <Icon className="h-3.5 w-3.5" aria-hidden />
+      {formatSignedPoints(value)}
     </span>
   );
 }
 
 export default function ScoreHistory() {
+  const hydrated = useHydrated();
   const results = useAftResults();
-  const oldestFirst = sortByTestDate(results);
+  const progress = buildProgress(results);
 
-  if (oldestFirst.length === 0) {
+  // Entries render after browser storage is read, so scroll to a linked entry once, when they first appear.
+  useEffect(() => {
+    if (!hydrated || !window.location.hash) return;
+    document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: "start" });
+  }, [hydrated]);
+
+  const storageNote = (
+    <p className="flex gap-2 text-sm text-ink-2">
+      <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+      Records are saved only in this browser. They don&apos;t sync between devices, and clearing this site&apos;s data
+      removes them.
+    </p>
+  );
+
+  if (!hydrated) {
+    return <div className="h-40 rounded-xl border border-line bg-surface" aria-busy="true" aria-label="Loading history" />;
+  }
+
+  if (progress.length === 0) {
     return (
-      <div className="rounded-2xl border border-zinc-800 p-6 text-zinc-300">
-        <p>No saved AFT results on this device yet.</p>
-        <Link href="/aft-calculator" className="mt-4 inline-block font-bold text-yellow-400 underline">
-          Score a test
-        </Link>
-      </div>
+      <Card className="max-w-2xl">
+        <p className="text-sm text-ink">No saved AFT results in this browser yet.</p>
+        <ButtonLink href="/aft-calculator" className="mt-4">
+          Record AFT
+        </ButtonLink>
+        <div className="mt-4">{storageNote}</div>
+      </Card>
     );
   }
 
-  const entries = oldestFirst
-    .map((item, index) => ({ item, previous: index > 0 ? oldestFirst[index - 1] : null }))
-    .reverse();
-
   return (
     <div className="space-y-4">
-      <p className="text-sm text-zinc-500">
-        Results are saved only in this browser. Clearing site data removes them.
-      </p>
-      {entries.map(({ item, previous }) => (
-        <HistoryCard key={item.id} item={item} previous={previous} />
+      {storageNote}
+      {[...progress].reverse().map((item) => (
+        <HistoryEntry key={item.record.id} item={item} />
       ))}
     </div>
   );
 }
 
-function HistoryCard({ item, previous }: { item: SavedAftResult; previous: SavedAftResult | null }) {
-  const { result } = item;
+function HistoryEntry({ item }: { item: TestProgress }) {
+  const { record } = item;
+  const result = record.result;
   const rule = aftStandardRules[result.standard];
-  const previousPoints = (event: string) =>
-    previous?.result.events.find((e) => e.event === event)?.points ?? null;
 
   return (
-    <article className="rounded-2xl border border-yellow-500/20 bg-zinc-950 p-4 sm:p-6">
+    <article id={`result-${record.id}`} className="scroll-mt-28 rounded-xl border border-line bg-surface p-4 sm:p-5 lg:scroll-mt-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black text-white">{formatTestDate(item.testDate)}</h2>
-          <p className="text-sm text-zinc-400">
-            {rule.label} standard · age group {result.ageGroup}
-          </p>
+          <h2 className="text-base font-semibold text-ink">{testLabel(item)}</h2>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <Chip>{describeCategory(categoryOf(result))}</Chip>
+            <Chip>Age {record.input.age}</Chip>
+          </div>
         </div>
         <div className="text-right">
-          <p className="text-3xl font-black text-yellow-400">{result.total}</p>
-          <p className={`font-black ${result.passed ? "text-green-500" : "text-red-500"}`}>
-            {result.passed ? "PASS" : "FAIL"}
+          <p className="flex items-baseline justify-end gap-1">
+            <span className="text-3xl font-semibold tracking-tight text-ink">{result.total}</span>
+            <span className="text-xs text-ink-2">/ 500</span>
           </p>
-          <p className="text-sm">
-            <Change value={previous ? result.total - previous.result.total : null} />
-            {previous && <span className="text-zinc-500"> vs previous</span>}
-          </p>
+          <div className="mt-1 flex items-center justify-end gap-2 text-sm">
+            <PassFailBadge passed={result.passed} />
+            {item.previousComparable && (
+              <span className="text-ink-2">
+                <PointsChange value={item.totalChange} /> vs {formatTestDate(item.previousComparable.testDate)}
+              </span>
+            )}
+          </div>
         </div>
       </header>
 
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[420px] text-left text-sm">
-          <thead className="text-zinc-400">
+      {item.categoryChanges.length > 0 && (
+        <p className="mt-3 flex gap-1.5 rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-xs text-ink-2">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span>
+            {item.categoryChanges.join(". ")} since the previous test. Point changes compare only with tests in the same
+            scoring category{item.previousComparable ? "" : ", and there is no earlier one"}.
+          </span>
+        </p>
+      )}
+
+      {result.failReasons.length > 0 && (
+        <ul className="mt-3 space-y-0.5 text-xs text-bad">
+          {result.failReasons.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      )}
+
+      <div className="relative mt-4 overflow-x-auto">
+        <table className="w-full min-w-[520px] text-left text-sm">
+          <thead className="text-xs text-ink-2">
             <tr>
-              <th className="py-2 font-bold uppercase">Event</th>
-              <th className="py-2 font-bold uppercase">Raw</th>
-              <th className="py-2 font-bold uppercase">Points</th>
-              <th className="py-2 font-bold uppercase">Change</th>
+              <th className="py-2 pr-3 font-medium">Event</th>
+              <th className="py-2 pr-3 text-right font-medium">Result</th>
+              <th className="py-2 pr-3 font-medium">Change vs previous test</th>
+              <th className="py-2 pr-3 text-right font-medium">Points</th>
+              <th className="py-2 text-right font-medium">Point change*</th>
             </tr>
           </thead>
-          <tbody>
-            {result.events.map((event) => {
-              const before = previousPoints(event.event);
+          <tbody className="tabular-nums">
+            {item.events.map((entry) => {
+              const raw = entry.rawChange === null ? null : describeRawChange(entry.event, entry.rawChange);
+              const below = entry.points < rule.minEventPoints;
               return (
-                <tr key={event.event} className="border-t border-zinc-800">
-                  <td className="py-2">{aftEventInfo[event.event].name}</td>
-                  <td className="py-2 text-zinc-300">{formatRaw(event.event, event.raw)}</td>
+                <tr key={entry.event} className="border-t border-line">
+                  <td className="py-2 pr-3 text-ink">{aftEventInfo[entry.event].name}</td>
+                  <td className="py-2 pr-3 text-right text-ink">{formatRaw(entry.event, entry.raw)}</td>
                   <td
-                    className={`py-2 font-bold ${event.points < rule.minEventPoints ? "text-red-400" : "text-yellow-400"}`}
+                    className={`py-2 pr-3 ${
+                      raw?.improved === true ? "text-good" : raw?.improved === false ? "text-bad" : "text-ink-2"
+                    }`}
                   >
-                    {event.points}
+                    {raw ? raw.text : "—"}
                   </td>
-                  <td className="py-2">
-                    <Change value={before === null ? null : event.points - before} />
+                  <td className={`py-2 pr-3 text-right font-semibold ${below ? "text-bad" : "text-ink"}`}>
+                    {entry.points}
+                  </td>
+                  <td className="py-2 text-right">
+                    <PointsChange value={entry.pointsChange} />
                   </td>
                 </tr>
               );
@@ -122,15 +156,21 @@ function HistoryCard({ item, previous }: { item: SavedAftResult; previous: Saved
         </table>
       </div>
 
-      <button
-        type="button"
-        onClick={() => {
-          if (window.confirm("Delete this saved result? This cannot be undone.")) deleteAftResult(item.id);
-        }}
-        className="mt-4 text-sm font-bold uppercase text-zinc-400 hover:text-red-400"
-      >
-        Delete
-      </button>
+      <footer className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-ink-2">*Compared with the last test in the same scoring category.</p>
+        <button
+          type="button"
+          onClick={() => {
+            if (window.confirm(`Delete the result from ${testLabel(item)}? This cannot be undone.`)) {
+              deleteAftResult(record.id);
+            }
+          }}
+          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-ink-2 hover:bg-bad/10 hover:text-bad"
+        >
+          <Trash2 className="h-3.5 w-3.5" aria-hidden />
+          Delete<span className="sr-only"> result from {testLabel(item)}</span>
+        </button>
+      </footer>
     </article>
   );
 }
