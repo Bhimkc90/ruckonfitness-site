@@ -30,13 +30,11 @@ export default function WorkoutLibraryPage() {
           <p className="text-sm text-ink-2">
             {TRAINING_PLANS_ENABLED
               ? "Suggested sessions, weekly schedules, and progress tracking built from your AFT results are in Training plans. They link back to these instructions."
-              : "Suggested sessions built from your AFT results will live in Training plans once they have been professionally reviewed. The library contains exercise instructions and official drills only."}
+              : "Suggested sessions and weekly schedules are in Training plans, which shows preview examples while personalized plans await professional review. The library contains exercise instructions and official drills only."}
           </p>
-          {TRAINING_PLANS_ENABLED && (
-            <ButtonLink href="/training-plan" className="mt-4">
-              Open training plans
-            </ButtonLink>
-          )}
+          <ButtonLink href="/training-plan" variant="secondary" className="mt-4">
+            {TRAINING_PLANS_ENABLED ? "Open training plans" : "See preview examples"}
+          </ButtonLink>
         </Card>
 
         <Card

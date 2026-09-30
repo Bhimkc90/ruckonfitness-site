@@ -16,6 +16,7 @@ import {
   sources,
 } from "./index";
 import type { LibraryFilters } from "./index";
+import { filterSections, librarySections, matchingExerciseCount } from "./sections";
 
 // Official exercise order, typed independently from ATP 7-22.02 (INCL C1):
 // para 3-1 (p. 3-1), 4-15 – 4-18 (pp. 4-9 – 4-11), 8-3 – 8-5 (pp. 8-1 – 8-2), 5-1 (p. 5-1), 5-18 (p. 5-9),
@@ -259,5 +260,73 @@ describe("internal links", () => {
       const id = drillHref(drill.id).split("/").pop()!;
       expect(getDrill(id)?.id).toBe(drill.id);
     }
+  });
+});
+
+describe("library sections", () => {
+  const sections = librarySections();
+  const all = { query: "", drill: "all", purpose: "all", phase: "all", equipment: "all", aftEvent: "all" } as const;
+
+  it("orders drill sections Preparation, Conditioning 1 and 2, other drills, Recovery, then app categories", () => {
+    expect(sections.map((s) => s.id)).toEqual([
+      "preparation-drill",
+      "conditioning-drill-1",
+      "conditioning-drill-2",
+      "four-for-the-core",
+      "military-movement-drill-1",
+      "recovery-drill",
+      "more-strength",
+    ]);
+  });
+
+  it("keeps each drill's official exercise order and uses the official drill names", () => {
+    for (const section of sections) {
+      if (section.kind !== "drill") continue;
+      expect(section.exerciseIds).toEqual(section.drill.sequence);
+      expect(section.title).toBe(section.drill.name);
+    }
+  });
+
+  it("shows every exercise, puts only non-drill exercises in app categories, and references records by ID", () => {
+    const shown = new Set(sections.flatMap((s) => s.exerciseIds));
+    expect(shown.size).toBe(exercises.length);
+    const inDrills = new Set(drills.flatMap((d) => d.sequence));
+    const categoryIds = sections.filter((s) => s.kind === "category").flatMap((s) => s.exerciseIds);
+    expect(categoryIds.sort()).toEqual(exercises.filter((e) => !inDrills.has(e.id)).map((e) => e.id).sort());
+    expect(new Set(categoryIds).size).toBe(categoryIds.length);
+    // Rear Lunge appears in two sections but is the same record.
+    const lunges = filterSections({ ...all, query: "rear lunge" }).flatMap((v) => v.exercises.filter((e) => e.id === "rear-lunge"));
+    expect(lunges).toHaveLength(2);
+    expect(lunges[0]).toBe(lunges[1]);
+  });
+
+  it("returns every section with no filters", () => {
+    const visible = filterSections(all);
+    expect(visible.map((v) => v.section.id)).toEqual(sections.map((s) => s.id));
+    expect(matchingExerciseCount(visible)).toBe(exercises.length);
+  });
+
+  it("hides empty sections and counts distinct matches across sections", () => {
+    const kettlebell = filterSections({ ...all, equipment: "kettlebell" });
+    expect(kettlebell.map((v) => v.section.id)).toEqual(["more-strength"]);
+    const jumping = filterSections({ ...all, query: "jump" });
+    expect(jumping.every((v) => v.exercises.length > 0)).toBe(true);
+    const lunge = filterSections({ ...all, query: "rear lunge" });
+    expect(lunge.map((v) => v.section.id)).toEqual(["preparation-drill", "recovery-drill"]);
+    expect(matchingExerciseCount(lunge)).toBe(1);
+  });
+
+  it("combines search and filters, and a drill filter shows only that drill in order", () => {
+    const cd1 = filterSections({ ...all, drill: "conditioning-drill-1" });
+    expect(cd1).toHaveLength(1);
+    expect(cd1[0].exercises.map((e) => e.id)).toEqual(getDrill("conditioning-drill-1")!.sequence);
+    const combo = filterSections({ ...all, drill: "preparation-drill", purpose: "mobility-flexibility", query: "lunge" });
+    expect(combo.flatMap((v) => v.exercises.map((e) => e.id)).every((id) => getDrill("preparation-drill")!.sequence.includes(id))).toBe(true);
+    const order = combo[0]?.exercises.map((e) => getDrill("preparation-drill")!.sequence.indexOf(e.id)) ?? [];
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(filterSections({ ...all, equipment: "barbell-or-hex-bar", phase: "recovery" })).toEqual([]);
+    // Phase follows the section's drill: Rear Lunge is a recovery exercise only under the Recovery Drill.
+    expect(filterSections({ ...all, query: "rear lunge", phase: "recovery" }).map((v) => v.section.id)).toEqual(["recovery-drill"]);
+    expect(filterSections({ ...all, phase: "warm-up" }).map((v) => v.section.id)).toEqual(["preparation-drill", "four-for-the-core", "military-movement-drill-1"]);
   });
 });
