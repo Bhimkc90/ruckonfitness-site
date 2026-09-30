@@ -3,9 +3,12 @@ import { addDays, defaultSessionDate, weekWindow } from "@/lib/training/engine";
 import type { Difficulty, PlanDraft, SessionCompletion, StoredPlan } from "@/lib/training/types";
 
 // Training plans live in their own key, separate from AFT history, and only in this browser.
-const STORAGE_KEY = "ruckon.trainingPlans";
-const SCHEMA_VERSION = 1;
-const CHANGE_EVENT = "ruckon:training-plans-changed";
+export const TRAINING_KEY = "ruckon.trainingPlans";
+export const TRAINING_SCHEMA_VERSION = 1;
+export const TRAINING_EVENT = "ruckon:training-plans-changed";
+const STORAGE_KEY = TRAINING_KEY;
+const SCHEMA_VERSION = TRAINING_SCHEMA_VERSION;
+const CHANGE_EVENT = TRAINING_EVENT;
 
 export type TrainingData = {
   schemaVersion: number;

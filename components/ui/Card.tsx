@@ -1,10 +1,12 @@
 export function Card({
+  id,
   title,
   description,
   action,
   className = "",
   children,
 }: {
+  id?: string;
   title?: string;
   description?: React.ReactNode;
   action?: React.ReactNode;
@@ -12,7 +14,7 @@ export function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section className={`rounded-xl border border-line bg-surface p-4 sm:p-5 ${className}`}>
+    <section id={id} className={`scroll-mt-24 rounded-xl border border-line bg-surface p-4 sm:p-5 ${className}`}>
       {(title || action) && (
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>

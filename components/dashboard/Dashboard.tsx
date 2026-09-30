@@ -23,6 +23,7 @@ import {
   rawUnitLabel,
 } from "@/lib/aft/format";
 import { useAftResults, useHydrated } from "@/lib/storage/aftResults";
+import { useSettings } from "@/lib/storage/settings";
 import { Card, PageHeader } from "@/components/ui/Card";
 import { ButtonLink } from "@/components/ui/Button";
 import { PassFailBadge } from "@/components/ui/StatusBadge";
@@ -76,8 +77,12 @@ function ChangeValue({ value, suffix = "" }: { value: number | null; suffix?: st
 export default function Dashboard() {
   const hydrated = useHydrated();
   const results = useAftResults();
-  const [event, setEvent] = useState<AftEventCode>("MDL");
-  const [mode, setMode] = useState<Mode>("points");
+  const settings = useSettings();
+  // Chosen on this page; until then the defaults from Settings apply.
+  const [chosenEvent, setEvent] = useState<AftEventCode | null>(null);
+  const [chosenMode, setMode] = useState<Mode | null>(null);
+  const event = chosenEvent ?? settings.trendEvent;
+  const mode = chosenMode ?? settings.trendView;
 
   if (!hydrated) return <DashboardLoading />;
 

@@ -3,9 +3,12 @@ import type { AftInput, AftResult } from "@/lib/aft/types";
 import { aftScoringFile } from "@/lib/aft/scoringFile";
 
 // Results are stored only in this browser (prototype). No account or cloud copy exists.
-const STORAGE_KEY = "ruckon.aftResults";
-const SCHEMA_VERSION = 1;
-const CHANGE_EVENT = "ruckon:aft-results-changed";
+export const AFT_RESULTS_KEY = "ruckon.aftResults";
+export const AFT_RESULTS_SCHEMA_VERSION = 1;
+export const AFT_RESULTS_EVENT = "ruckon:aft-results-changed";
+const STORAGE_KEY = AFT_RESULTS_KEY;
+const SCHEMA_VERSION = AFT_RESULTS_SCHEMA_VERSION;
+const CHANGE_EVENT = AFT_RESULTS_EVENT;
 
 export type SavedAftResult = {
   id: string;
@@ -26,7 +29,7 @@ const EMPTY: SavedAftResult[] = [];
 let cachedRaw: string | null | undefined;
 let cachedResults: SavedAftResult[] = EMPTY;
 
-function isSavedResult(value: unknown): value is SavedAftResult {
+export function isSavedResult(value: unknown): value is SavedAftResult {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<SavedAftResult>;
   return (
@@ -41,7 +44,7 @@ function isSavedResult(value: unknown): value is SavedAftResult {
   );
 }
 
-function parse(raw: string | null): SavedAftResult[] {
+export function parseAftResults(raw: string | null): SavedAftResult[] {
   if (!raw) return EMPTY;
   try {
     const data = JSON.parse(raw) as Partial<StoredData>;
@@ -64,7 +67,7 @@ function getSnapshot(): SavedAftResult[] {
   const raw = readRaw();
   if (raw !== cachedRaw) {
     cachedRaw = raw;
-    cachedResults = parse(raw);
+    cachedResults = parseAftResults(raw);
   }
   return cachedResults;
 }

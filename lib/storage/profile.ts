@@ -4,7 +4,8 @@ import { PROFILE_SCHEMA_VERSION, parseProfile, type SoldierProfile } from "@/lib
 // The profile lives in its own key, only in this browser. It is separate from AFT history
 // (ruckon.aftResults) and training plans (ruckon.trainingPlans); saving or deleting it never touches those.
 export const PROFILE_KEY = "ruckon.profile";
-const CHANGE_EVENT = "ruckon:profile-changed";
+export const PROFILE_EVENT = "ruckon:profile-changed";
+const CHANGE_EVENT = PROFILE_EVENT;
 
 let cachedRaw: string | null | undefined;
 let cachedProfile: SoldierProfile | null = null;
