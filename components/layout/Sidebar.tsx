@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Backpack,
   BookOpen,
+  ClipboardList,
   ClipboardPlus,
   Dumbbell,
   History,
@@ -17,6 +18,7 @@ import {
 const primaryItems = [
   { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { name: "Record AFT", icon: ClipboardPlus, href: "/aft-calculator" },
+  { name: "AFT Guide", icon: ClipboardList, href: "/aft-guide" },
   { name: "History", icon: History, href: "/score-history" },
   { name: "Library", icon: BookOpen, href: "/workouts" },
 ];
