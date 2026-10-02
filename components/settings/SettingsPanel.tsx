@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Download, FileUp, Trash2 } from "lucide-react";
 import { aftEventInfo } from "@/lib/aft/scoring";
@@ -57,6 +57,11 @@ function useExport(appVersion: string) {
 
 export default function SettingsPanel({ appVersion }: { appVersion: string }) {
   const hydrated = useHydrated();
+  // Sections render after browser storage is read, so scroll to a linked one (e.g. /settings#data) once it appears.
+  useEffect(() => {
+    if (!hydrated || !window.location.hash) return;
+    document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: "start" });
+  }, [hydrated]);
   if (!hydrated) return <div className="h-60 rounded-xl border border-card-line bg-surface shadow-sm" aria-busy="true" aria-label="Loading settings" />;
   return (
     <div className="space-y-5">

@@ -1,21 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BookOpen, ClipboardCheck, Database, Dumbbell, LineChart, Target, UserRound } from "lucide-react";
+import { ArrowRight, BookOpen, ClipboardCheck, Dumbbell, LineChart, Target, UserRound } from "lucide-react";
 import { scoreAft, aftEventInfo } from "@/lib/aft/scoring";
 import { aftStandardRules } from "@/lib/aft/rules";
 import { columnLabel, formatRaw } from "@/lib/aft/format";
-import { aftScoringFile } from "@/lib/aft/scoringFile";
-import { aftRulesSource } from "@/lib/aft/rules";
-import { guideSources } from "@/lib/aft/guideSources";
-import { sources as librarySources } from "@/lib/library";
 import { TRAINING_PLANS_ENABLED } from "@/lib/features";
 import type { AftInput } from "@/lib/aft/types";
 import { ButtonLink } from "@/components/ui/Button";
 import { PassFailBadge } from "@/components/ui/StatusBadge";
-import BrandLink from "@/components/layout/BrandLink";
 import PublicHeader from "@/components/home/PublicHeader";
-import AppEntryLink from "@/components/home/AppEntryLink";
-import SiteCredit from "@/components/layout/SiteCredit";
+import SiteFooter from "@/components/layout/SiteFooter";
 
 export const metadata: Metadata = {
   title: { absolute: "RuckOn Fitness: Army Fitness Test calculator, progress, and exercise guides" },
@@ -211,58 +205,7 @@ export default function HomePage() {
         </section>
       </main>
 
-      <footer className="theme-dark bg-canvas text-ink">
-        <div className="mx-auto grid max-w-content gap-8 px-4 py-10 sm:px-6 md:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] lg:px-8">
-          <div className="flex flex-col items-start gap-4">
-            <BrandLink tone="dark" className="h-12 w-auto" />
-            <AppEntryLink />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-wide text-ink">Official sources</h2>
-            <ul className="mt-3 space-y-2 text-sm text-ink-2">
-              <li>
-                <a href={aftScoringFile.path} className="underline decoration-line-strong underline-offset-2 hover:text-ink">
-                  {aftScoringFile.title}
-                </a>{" "}
-                (effective {aftScoringFile.effectiveDate})
-              </li>
-              <li>
-                <a href={aftRulesSource.url} className="underline decoration-line-strong underline-offset-2 hover:text-ink">
-                  {aftRulesSource.publisher}, {aftRulesSource.title}
-                </a>{" "}
-                ({aftRulesSource.date})
-              </li>
-              <li>
-                <a href={guideSources.atp72201.url} className="underline decoration-line-strong underline-offset-2 hover:text-ink">
-                  {guideSources.atp72201.number}, {guideSources.atp72201.title}
-                </a>{" "}
-                ({guideSources.atp72201.date})
-              </li>
-              <li>
-                <a href={librarySources["atp-7-22-02-c1"].url} className="underline decoration-line-strong underline-offset-2 hover:text-ink">
-                  {librarySources["atp-7-22-02-c1"].number}, {librarySources["atp-7-22-02-c1"].title}
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div className="space-y-3 text-sm text-ink-2">
-            <p className="flex gap-2">
-              <Database className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              <span>
-                No account. Your profile, results, and settings are stored only in this browser on this device. They
-                don&apos;t sync between devices, and clearing site data removes them. Settings can export a backup.
-              </span>
-            </p>
-            <p>
-              Unofficial tool, not affiliated with or endorsed by the U.S. Army. Confirm official results with your
-              unit.
-            </p>
-          </div>
-        </div>
-        <div className="border-t border-line">
-          <SiteCredit className="mx-auto max-w-content px-4 py-4 sm:px-6 lg:px-8" />
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
