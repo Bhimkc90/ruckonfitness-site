@@ -1,12 +1,14 @@
 import Link from "next/link";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "dark" | "secondary" | "ghost";
 
 const base =
   "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 
 const variants: Record<Variant, string> = {
   primary: "border border-accent bg-accent text-black hover:border-accent-hover hover:bg-accent-hover",
+  // A confirming action that should not compete with the yellow primary, e.g. Save after Calculate.
+  dark: "border border-ink bg-ink text-canvas hover:bg-ink/85",
   secondary: "border border-line-strong bg-surface text-ink hover:border-ink hover:bg-surface-2",
   ghost: "text-ink-2 hover:bg-surface-2 hover:text-ink",
 };

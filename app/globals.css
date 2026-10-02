@@ -76,6 +76,11 @@ body {
   outline-offset: 2px;
 }
 
+/* Headings that receive focus from script (tabindex="-1") to orient screen readers aren't controls. */
+[tabindex="-1"]:focus {
+  outline: none;
+}
+
 /* Highlight a history entry opened from a link such as /score-history#result-<id>. */
 [id^="result-"]:target {
   outline: 2px solid var(--color-ink);
@@ -88,4 +93,9 @@ body {
     scroll-behavior: auto !important;
     transition: none !important;
   }
+}
+
+/* Keep the page behind an open modal drawer from scrolling. */
+html:has(dialog[open]) {
+  overflow: hidden;
 }

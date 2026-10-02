@@ -93,8 +93,17 @@ export function validateAftForm(values: AftFormValues, today?: string): AftValid
       errors[field] = `${label} time is required.`;
       return 0;
     }
-    const minutes = minutesValue.trim() === "" ? 0 : parseWholeNumber(minutesValue);
-    const seconds = secondsValue.trim() === "" ? 0 : parseWholeNumber(secondsValue);
+    // Both parts are required so a blank is never read as zero; "0" is a valid entry.
+    if (minutesValue.trim() === "") {
+      errors[field] = "Enter minutes too (0 if under a minute).";
+      return 0;
+    }
+    if (secondsValue.trim() === "") {
+      errors[field] = "Enter seconds too (00 for whole minutes).";
+      return 0;
+    }
+    const minutes = parseWholeNumber(minutesValue);
+    const seconds = parseWholeNumber(secondsValue);
     if (minutes === null || minutes > 99) {
       errors[field] = "Minutes must be a whole number from 0 to 99.";
       return 0;
@@ -110,7 +119,7 @@ export function validateAftForm(values: AftFormValues, today?: string): AftValid
 
   const raw = {
     MDL: count("deadlift", "Deadlift weight", 1000),
-    HRP: count("pushups", "Push-ups", 300),
+    HRP: count("pushups", "Push-up count", 300),
     SDC: time("sdc", values.sdcMinutes, values.sdcSeconds, "Sprint-drag-carry"),
     PLK: time("plank", values.plankMinutes, values.plankSeconds, "Plank"),
     "2MR": time("run", values.runMinutes, values.runSeconds, "2-mile run"),

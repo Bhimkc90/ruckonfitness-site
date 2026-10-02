@@ -44,6 +44,15 @@ describe("validateAftForm", () => {
     }
   });
 
+  it("requires both minutes and seconds for a time instead of treating either blank as zero", () => {
+    const noMinutes = validateAftForm({ ...valid, plankMinutes: "", plankSeconds: "45" }, today);
+    const noSeconds = validateAftForm({ ...valid, runMinutes: "19", runSeconds: "" }, today);
+    expect(noMinutes.ok || noMinutes.errors.plank).toMatch(/minutes/);
+    expect(noSeconds.ok || noSeconds.errors.run).toMatch(/seconds/);
+    const underAMinute = validateAftForm({ ...valid, plankMinutes: "0", plankSeconds: "45" }, today);
+    expect(underAMinute.ok && underAMinute.input.raw.PLK).toBe(45);
+  });
+
   it("rejects out-of-range and non-whole values", () => {
     const result = validateAftForm(
       { ...valid, age: "16", deadlift: "-5", pushups: "12.5", sdcSeconds: "60", testDate: "2026-10-01" },
