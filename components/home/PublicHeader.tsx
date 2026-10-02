@@ -31,7 +31,7 @@ export default function PublicHeader() {
 
   return (
     <header className="theme-dark sticky top-0 z-30 border-b border-line bg-canvas text-ink">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-content items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <BrandLink tone="dark" className="h-10 w-auto" />
 
         <nav aria-label="Main" className="hidden items-center gap-1 md:flex">

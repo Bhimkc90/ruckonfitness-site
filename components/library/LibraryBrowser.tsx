@@ -445,7 +445,7 @@ function ExerciseRow({
               </span>
             </span>
             {context && <span className="mt-0.5 block text-xs text-ink-2">{context}</span>}
-            <span id={summaryId} className="mt-1 line-clamp-2 block text-sm leading-relaxed text-ink-2">
+            <span id={summaryId} className="mt-1 line-clamp-2 block max-w-[75ch] text-sm leading-relaxed text-ink-2">
               {exercise.summary}
             </span>
             <span className="mt-2 flex flex-wrap gap-1.5">
@@ -516,7 +516,7 @@ function InlineInstructions({
   };
 
   return (
-    <div className="border-t border-card-line px-3 pb-4 pt-4 sm:px-5 sm:pb-5">
+    <div className="readable border-t border-card-line px-3 pb-4 pt-4 sm:px-5 sm:pb-5">
       <div className="grid gap-6 lg:grid-cols-2">
         {figures.length > 0 && (
           <div className="min-w-0 lg:order-2">

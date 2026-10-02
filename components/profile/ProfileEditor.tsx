@@ -266,7 +266,7 @@ function ProfileForm({ profile, onSaved, onCancel }: { profile: SoldierProfile |
         handleSave();
       }} noValidate>
       <Card title="About you" description="Used to prefill the AFT calculator.">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Field label="Display name (optional)" error={errors.displayName} hint="Shown on your dashboard. A nickname is fine.">
             <input
               value={values.displayName}

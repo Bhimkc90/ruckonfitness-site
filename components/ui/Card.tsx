@@ -14,7 +14,7 @@ export function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className={`scroll-mt-28 rounded-xl border border-card-line bg-surface p-4 shadow-sm sm:p-5 lg:scroll-mt-6 ${className}`}>
+    <section id={id} className={`readable scroll-mt-28 rounded-xl border border-card-line bg-surface p-4 shadow-sm sm:p-5 lg:scroll-mt-6 ${className}`}>
       {(title || action) && (
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>

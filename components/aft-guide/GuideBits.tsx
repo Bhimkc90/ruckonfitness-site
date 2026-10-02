@@ -26,7 +26,7 @@ export function GuideSection({
 }) {
   const H = level === 2 ? "h2" : "h3";
   return (
-    <section id={id} aria-labelledby={id ? `${id}-heading` : undefined} className="scroll-mt-28 rounded-xl border border-card-line bg-surface p-4 shadow-sm sm:p-5 lg:scroll-mt-6">
+    <section id={id} aria-labelledby={id ? `${id}-heading` : undefined} className="readable scroll-mt-28 rounded-xl border border-card-line bg-surface p-4 shadow-sm sm:p-5 lg:scroll-mt-6">
       <H id={id ? `${id}-heading` : undefined} className="text-lg font-bold text-ink">
         {title}
       </H>

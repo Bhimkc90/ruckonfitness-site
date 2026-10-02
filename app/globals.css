@@ -27,6 +27,10 @@
   --color-card-hover: #fbfaf6;
   --color-card-line: #d9d6cc;
 
+  /* Page content width (max-w-content): about 1440px of content plus side padding. Wide enough for charts and
+     two-column layouts beside the sidebar without stretching edge to edge on large screens. */
+  --container-content: 94rem;
+
   /* Drill-category accents (always paired with a text label). */
   --color-prep: #0f766e;
   --color-activity: #b45309;
@@ -54,6 +58,16 @@
   --color-prep: #5eead4;
   --color-activity: #fdba74;
   --color-recovery: #a5b4fc;
+}
+
+/* Keeps running text at a comfortable line length inside wide sections; charts, tables, and figures still use
+   the full width. Applied by shared containers (Card, GuideSection, library instructions). */
+@utility readable {
+  & p,
+  & li,
+  & dd {
+    max-width: 75ch;
+  }
 }
 
 @theme inline {

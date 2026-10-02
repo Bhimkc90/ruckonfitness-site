@@ -71,7 +71,7 @@ export default function HomePage() {
 
       <main className="flex-1">
         {/* Hero and product preview */}
-        <section className="mx-auto grid max-w-6xl gap-10 px-4 pb-14 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:items-center lg:px-8 lg:pt-16">
+        <section className="mx-auto grid max-w-content gap-10 px-4 pb-14 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:items-center lg:px-8 lg:pt-16">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-accent-ink">Army Fitness Test companion</p>
             <h1 className="mt-2 text-4xl font-bold tracking-tight text-ink sm:text-5xl">Know your score. Build your readiness.</h1>
@@ -133,7 +133,7 @@ export default function HomePage() {
 
         {/* Features */}
         <section aria-labelledby="features-heading" className="border-y border-line bg-surface">
-          <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-content px-4 py-14 sm:px-6 lg:px-8">
             <h2 id="features-heading" className="text-2xl font-bold tracking-tight sm:text-3xl">
               What you can do
             </h2>
@@ -160,7 +160,7 @@ export default function HomePage() {
         </section>
 
         {/* Getting started */}
-        <section aria-labelledby="start-heading" className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
+        <section aria-labelledby="start-heading" className="mx-auto max-w-content px-4 py-14 sm:px-6 lg:px-8">
           <h2 id="start-heading" className="text-2xl font-bold tracking-tight sm:text-3xl">
             Getting started
           </h2>
@@ -188,7 +188,7 @@ export default function HomePage() {
         </section>
 
         {/* Training plans */}
-        <section aria-labelledby="plans-heading" className="mx-auto max-w-6xl px-4 pb-14 sm:px-6 lg:px-8">
+        <section aria-labelledby="plans-heading" className="mx-auto max-w-content px-4 pb-14 sm:px-6 lg:px-8">
           <div className="grid gap-5 rounded-2xl border border-card-line bg-surface p-6 shadow-sm md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-ink text-accent">
               <Dumbbell className="h-6 w-6" aria-hidden />
@@ -212,7 +212,7 @@ export default function HomePage() {
       </main>
 
       <footer className="theme-dark bg-canvas text-ink">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] lg:px-8">
+        <div className="mx-auto grid max-w-content gap-8 px-4 py-10 sm:px-6 md:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] lg:px-8">
           <div className="flex flex-col items-start gap-4">
             <BrandLink tone="dark" className="h-12 w-auto" />
             <AppEntryLink />
@@ -260,7 +260,7 @@ export default function HomePage() {
           </div>
         </div>
         <div className="border-t border-line">
-          <SiteCredit className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8" />
+          <SiteCredit className="mx-auto max-w-content px-4 py-4 sm:px-6 lg:px-8" />
         </div>
       </footer>
     </div>
