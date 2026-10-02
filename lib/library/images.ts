@@ -79,10 +79,14 @@ export function figuresFor(exerciseId: string): ExerciseFigure[] {
 
 // Within a drill section, prefer that drill's own figure (Rear Lunge shows figure 16-2 under the Recovery
 // Drill and 3-3 under the Preparation Drill). Captions start with the drill abbreviation, e.g. "RD2".
-export function thumbnailFor(exerciseId: string, drillAbbreviation?: string): ExerciseFigure | undefined {
+export function figuresInDrill(exerciseId: string, drillAbbreviation?: string): ExerciseFigure[] {
   const all = figuresFor(exerciseId);
   const own = drillAbbreviation ? all.filter((f) => new RegExp(`^${drillAbbreviation}[0-9.]`).test(f.caption)) : [];
-  const figures = own.length ? own : all;
+  return own.length ? own : all;
+}
+
+export function thumbnailFor(exerciseId: string, drillAbbreviation?: string): ExerciseFigure | undefined {
+  const figures = figuresInDrill(exerciseId, drillAbbreviation);
   return figures.find((f) => f.figure === THUMBNAILS[exerciseId]) ?? figures[0];
 }
 

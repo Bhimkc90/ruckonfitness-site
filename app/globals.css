@@ -9,6 +9,9 @@
   --color-line-strong: #3d4047;
   --color-accent: #facc15;
   --color-accent-hover: #fde047;
+  /* Accent used as text or an icon color. Yellow reads on the dark theme; the light surface uses dark gold. */
+  --color-accent-ink: #facc15;
+  --color-focus: #facc15;
   --color-ink: #f4f4f5;
   --color-ink-2: #b4b4bc;
   --color-good: #4ade80;
@@ -41,8 +44,33 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+/* Light reading surface for the workout library: off-white canvas, white panels, black headings, yellow
+   reserved for fills (active states, primary buttons) with black text on top. Navigation stays dark. */
+.theme-light {
+  color-scheme: light;
+  --color-canvas: #f5f4ef;
+  --color-surface: #ffffff;
+  --color-surface-2: #efeee8;
+  --color-line: #e2e0d8;
+  --color-line-strong: #b9b5a9;
+  --color-accent-ink: #7a5300;
+  --color-focus: #111111;
+  --color-ink: #111111;
+  --color-ink-2: #4a4a50;
+  --color-good: #15803d;
+  --color-bad: #b91c1c;
+
+  --color-card: #ffffff;
+  --color-card-hover: #fbfaf6;
+  --color-card-line: #d9d6cc;
+
+  --color-prep: #0f766e;
+  --color-activity: #b45309;
+  --color-recovery: #4338ca;
 }
 
 /* Highlight a history entry opened from a link such as /score-history#result-<id>. */

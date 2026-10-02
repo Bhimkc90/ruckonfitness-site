@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { Citation, LegendNote, SourceList, SourceNote, Tag } from "@/components/library/LibraryBits";
+import { LegendNote, SourceList, Tag } from "@/components/library/LibraryBits";
+import { DemonstrationNote, ExecutionDetails, FormGuidance, hasFormGuidance } from "@/components/library/ExerciseDetail";
 import FigureGallery from "@/components/library/FigureGallery";
 import { figuresFor } from "@/lib/library/images";
 import {
   aftEventLabels,
-  cadenceLabels,
   drillHref,
   drillMemberships,
   equipmentLabels,
@@ -20,7 +20,6 @@ import {
   impactLabels,
   movementLabels,
   phaseLabels,
-  positions,
   purposeLabels,
 } from "@/lib/library";
 
@@ -76,7 +75,6 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
             const index = drill ? drill.sequence.indexOf(exercise.id) : -1;
             const previous = drill && index > 0 ? getExercise(drill.sequence[index - 1]) : undefined;
             const next = drill && index < drill.sequence.length - 1 ? getExercise(drill.sequence[index + 1]) : undefined;
-            const position = positions[execution.position];
             const contextName = drill ? drill.name : (execution.context ?? "");
 
             return (
@@ -85,51 +83,7 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
                 title={exercise.executions.length > 1 ? (drill ? `In the ${drill.name}` : `In ${contextName}`) : "How to perform it"}
                 description={drill ? `${drill.name}, exercise ${index + 1} of ${drill.sequence.length}` : contextName}
               >
-                <div className="flex flex-wrap gap-1.5">
-                  <Tag tone="official">{cadenceLabels[execution.cadence]}</Tag>
-                  {execution.officialPrescription && <Tag tone="official">{execution.officialPrescription}</Tag>}
-                </div>
-
-                <h3 className="mt-4 text-sm font-semibold text-ink">Starting position</h3>
-                <p className="mt-1 text-sm text-ink">{execution.startingPosition}</p>
-                {position.description && (
-                  <p className="mt-1 text-xs text-ink-2">
-                    {position.name}: {position.description}
-                    {position.source && (
-                      <>
-                        {" "}
-                        <Citation source={position.source} />
-                      </>
-                    )}
-                  </p>
-                )}
-
-                <h3 className="mt-4 text-sm font-semibold text-ink">
-                  {execution.cadence === "hold" ? "Commands and movement" : execution.cadence === "slow" || execution.cadence === "moderate" ? "Counts" : "Movement"}
-                </h3>
-                <ol className="mt-2 space-y-2">
-                  {execution.steps.map((step, stepIndex) => (
-                    <li key={stepIndex} className="flex gap-3 text-sm">
-                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-ink-2">
-                        {stepIndex + 1}
-                      </span>
-                      <span>
-                        <span className="font-medium text-ink">{step.label}.</span>{" "}
-                        <span className="text-ink-2">{step.text}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-
-                {execution.sourceNotes?.map((note) => (
-                  <div key={note} className="mt-3">
-                    <SourceNote>{note} Nothing has been added to fill the gap.</SourceNote>
-                  </div>
-                ))}
-
-                <p className="mt-4">
-                  <Citation source={execution.source} />
-                </p>
+                <ExecutionDetails execution={execution} />
 
                 {drill && (
                 <nav aria-label={`${drill.name} sequence`} className="mt-4 flex justify-between gap-2 border-t border-line pt-3 text-sm">
@@ -163,41 +117,9 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
             <p className="mt-2 text-xs text-ink-2">Focus: {exercise.focus.join(", ")}</p>
           </Card>
 
-          {(exercise.cues.length > 0 || exercise.commonMistakes.length > 0 || exercise.cautions.length > 0) && (
+          {hasFormGuidance(exercise) && (
             <Card title="Form" description="Drawn from the cited instructions.">
-              {exercise.cues.length > 0 && (
-                <>
-                  <h3 className="text-sm font-semibold text-ink">Cues</h3>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink-2">
-                    {exercise.cues.map((cue) => (
-                      <li key={cue}>{cue}</li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              {exercise.commonMistakes.length > 0 && (
-                <>
-                  <h3 className="mt-4 text-sm font-semibold text-ink">Common mistakes</h3>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink-2">
-                    {exercise.commonMistakes.map((mistake) => (
-                      <li key={mistake}>{mistake}</li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              {exercise.cautions.length > 0 && (
-                <>
-                  <h3 className="mt-4 text-sm font-semibold text-ink">Cautions</h3>
-                  <ul className="mt-1 space-y-1 text-sm text-ink-2">
-                    {exercise.cautions.map((caution) => (
-                      <li key={caution} className="flex gap-2">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
-                        {caution}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
+              <FormGuidance exercise={exercise} />
             </Card>
           )}
         </div>
@@ -274,11 +196,9 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
 
           <Card title="Sources">
             <SourceList ids={sourceIds} />
-            <p className="mt-3 text-xs text-ink-2">
-              {figuresFor(exercise.id).length > 0
-                ? "Photos are the ATP's own figures. No demonstration video is linked: the ATP points to the Central Army Registry and army.mil/aft rather than a video for this exercise."
-                : "No demonstration video is linked: the ATP points to the Central Army Registry and army.mil/aft rather than a video for this exercise."}
-            </p>
+            <div className="mt-3">
+              <DemonstrationNote exercise={exercise} hasPhotos={figuresFor(exercise.id).length > 0} />
+            </div>
           </Card>
 
           <LegendNote />

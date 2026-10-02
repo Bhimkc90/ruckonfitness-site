@@ -139,7 +139,7 @@ function PreferencesCard() {
           <p className="text-ink-2">Units and theme</p>
           <p className="mt-1.5 text-ink">
             Results use the official units from the Army score tables: pounds, repetitions, and minutes:seconds. They can&apos;t be changed, so
-            scores always match the tables. RuckOn has one dark theme.
+            scores always match the tables. RuckOn uses a dark theme, with a light reading surface in the workout library.
           </p>
         </div>
       </div>

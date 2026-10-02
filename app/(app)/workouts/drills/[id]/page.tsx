@@ -70,7 +70,7 @@ export default async function DrillPage({ params }: { params: Promise<{ id: stri
                       href={exerciseHref(exerciseId)}
                       className="flex items-start gap-3 rounded-lg px-1 py-3 hover:bg-surface-2/60"
                     >
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/10 text-sm font-semibold text-accent">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/10 text-sm font-semibold text-accent-ink">
                         {index + 1}
                       </span>
                       <span className="min-w-0">

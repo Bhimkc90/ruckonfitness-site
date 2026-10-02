@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { exercises, getExercise } from "./index";
-import { exerciseFigures, figuresFor, thumbnailFor } from "./images";
+import { exerciseFigures, figuresFor, figuresInDrill, thumbnailFor } from "./images";
 
 const publicDir = join(__dirname, "..", "..", "public");
 
@@ -50,6 +50,13 @@ describe("exercise figures", () => {
     expect(thumbnailFor("rear-lunge", "PD")?.figure).toBe("3-3");
     expect(thumbnailFor("push-up", "PD")?.figure).toBe("3-13");
     expect(thumbnailFor("side-bridge", "4C")?.figure).toBe("4-13");
+  });
+
+  it("shows only a drill's own figures inline, or every figure outside a drill", () => {
+    expect(figuresInDrill("rear-lunge", "PD").map((f) => f.figure)).toEqual(["3-2", "3-3"]);
+    expect(figuresInDrill("rear-lunge", "RD").map((f) => f.figure)).toEqual(["16-2"]);
+    expect(figuresInDrill("straight-leg-deadlift").map((f) => f.figure)).toEqual(["13-2", "14-5"]);
+    expect(figuresInDrill("deadlift", "PD")).toEqual(figuresFor("deadlift"));
   });
 
   it("gives every library exercise a thumbnail from its own figures", () => {

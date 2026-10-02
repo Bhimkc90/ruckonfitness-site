@@ -23,7 +23,7 @@ export function Tag({ children, tone = "app" }: { children: React.ReactNode; ton
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${
         tone === "official"
-          ? "border border-accent/40 bg-accent/10 text-accent"
+          ? "border border-accent/40 bg-accent/10 text-accent-ink"
           : "border border-line bg-surface-2 text-ink-2"
       }`}
     >
@@ -48,7 +48,7 @@ export function SourceList({ ids }: { ids: (keyof typeof sources)[] }) {
         const source = sources[id];
         return (
           <li key={id}>
-            <a href={source.url} target="_blank" rel="noreferrer" className="font-medium text-accent hover:underline">
+            <a href={source.url} target="_blank" rel="noreferrer" className="font-medium text-accent-ink hover:underline">
               {source.number}, {source.title}
             </a>
             <p className="mt-0.5 text-xs text-ink-2">
