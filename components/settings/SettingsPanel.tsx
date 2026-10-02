@@ -84,7 +84,7 @@ function PreferencesCard() {
     <Card id="preferences" title="App preferences" description="Saved in this browser and applied immediately.">
       <div className="grid gap-5 md:grid-cols-2">
         <label className="block text-sm">
-          <span className="text-ink-2">Start page</span>
+          <span className="text-ink-2">App start page</span>
           <select
             value={settings.landingPage}
             onChange={(e) => update({ landingPage: e.target.value as LandingPage }, "Start page")}
@@ -96,7 +96,7 @@ function PreferencesCard() {
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-ink-2">Where ruckonfitness.com opens. Links to a specific page still open that page.</span>
+          <span className="mt-1 block text-xs text-ink-2">Where the Open button on the Home page takes you. The RuckOn logo always opens Home.</span>
         </label>
 
         <fieldset className="text-sm">

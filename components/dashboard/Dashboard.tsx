@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowDownRight, ArrowUpRight, ClipboardPlus, History, Info, Minus } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ClipboardPlus, Dumbbell, History, Info, Minus } from "lucide-react";
 import type { AftEventCode, AftResult } from "@/lib/aft/types";
 import { aftEventInfo, aftEventOrder } from "@/lib/aft/scoring";
 import { aftStandardRules } from "@/lib/aft/rules";
@@ -161,10 +161,6 @@ export default function Dashboard() {
           </>
         }
       />
-
-      <DashboardProfileCard latestTotal={latestResult.total} />
-
-      {TRAINING_PLANS_ENABLED && <DashboardPlanCard latestResultId={latest.record.id} />}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="sm:col-span-2 xl:col-span-1">
@@ -354,7 +350,33 @@ export default function Dashboard() {
         </div>
         <p className="mt-3 text-xs text-ink-2">Change compares totals with the last test in the same scoring category.</p>
       </Card>
+
+      <DashboardProfileCard latestTotal={latestResult.total} />
+
+      {TRAINING_PLANS_ENABLED ? <DashboardPlanCard latestResultId={latest.record.id} /> : <TrainingPreviewCard />}
     </div>
+  );
+}
+
+// While personalized plans are behind the release flag, point to the labeled examples instead of showing progress.
+function TrainingPreviewCard() {
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-accent">
+            <Dumbbell className="h-4 w-4" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-ink">Training plans are in preview</h2>
+            <p className="mt-0.5 text-sm text-ink-2">Personalized plans are waiting for professional review. Example plans show how they will work.</p>
+          </div>
+        </div>
+        <ButtonLink href="/training-plan" variant="secondary">
+          See example plans
+        </ButtonLink>
+      </div>
+    </Card>
   );
 }
 
@@ -424,6 +446,7 @@ function DashboardEmpty() {
           Results are saved only in this browser and don&apos;t sync between devices.
         </p>
       </Card>
+      {!TRAINING_PLANS_ENABLED && <TrainingPreviewCard />}
     </div>
   );
 }
