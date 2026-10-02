@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { TRAINING_PLANS_ENABLED } from "@/lib/features";
 import {
-  Backpack,
   BookOpen,
   ClipboardList,
   ClipboardPlus,
@@ -28,13 +28,19 @@ const primaryItems = [
   { name: "Settings", icon: Settings, href: "/settings" },
 ];
 
-function Brand() {
+// Full RuckOn Fitness logo, white-text version for the dark navigation (public/brand/README.md).
+function Brand({ className }: { className: string }) {
   return (
-    <Link href="/dashboard" className="flex items-center gap-2 rounded-lg">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-black">
-        <Backpack className="h-4 w-4" aria-hidden />
-      </span>
-      <span className="text-sm font-semibold tracking-tight text-ink">RuckOn Fitness</span>
+    <Link href="/dashboard" className="inline-flex rounded-lg">
+      <Image
+        src="/brand/ruckon-logo-on-dark.png"
+        alt="RuckOn Fitness"
+        width={1200}
+        height={374}
+        sizes="200px"
+        loading="eager"
+        className={className}
+      />
     </Link>
   );
 }
@@ -83,7 +89,7 @@ export default function Sidebar() {
       {/* Mobile: brand bar with a horizontally scrolling nav row. */}
       <header className="theme-dark sticky top-0 z-20 border-b border-line bg-canvas/95 text-ink backdrop-blur lg:hidden">
         <div className="px-4 pt-3">
-          <Brand />
+          <Brand className="h-9 w-auto" />
         </div>
         <nav ref={mobileNav} aria-label="Main" className="flex gap-1 overflow-x-auto px-3 py-2">
           {primaryItems.map((item) => (
@@ -95,7 +101,7 @@ export default function Sidebar() {
       {/* Desktop: compact fixed sidebar. */}
       <aside className="theme-dark sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-canvas px-3 py-5 text-ink lg:flex">
         <div className="px-2">
-          <Brand />
+          <Brand className="h-auto w-48" />
         </div>
         <nav aria-label="Main" className="mt-8 flex flex-col gap-1">
           {primaryItems.map((item) => (
