@@ -15,6 +15,7 @@ import { PassFailBadge } from "@/components/ui/StatusBadge";
 import BrandLink from "@/components/layout/BrandLink";
 import PublicHeader from "@/components/home/PublicHeader";
 import AppEntryLink from "@/components/home/AppEntryLink";
+import SiteCredit from "@/components/layout/SiteCredit";
 
 export const metadata: Metadata = {
   title: { absolute: "RuckOn Fitness: Army Fitness Test calculator, progress, and exercise guides" },
@@ -257,6 +258,9 @@ export default function HomePage() {
               unit.
             </p>
           </div>
+        </div>
+        <div className="border-t border-line">
+          <SiteCredit className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8" />
         </div>
       </footer>
     </div>

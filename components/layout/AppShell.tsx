@@ -1,4 +1,5 @@
 import Sidebar from "./Sidebar";
+import SiteCredit from "./SiteCredit";
 import { aftScoringFile } from "@/lib/aft/scoringFile";
 import { aftRulesSource } from "@/lib/aft/rules";
 
@@ -21,6 +22,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </a>
             . Confirm official results with your unit.
           </p>
+          <SiteCredit className="mt-2" />
         </footer>
       </div>
     </div>
