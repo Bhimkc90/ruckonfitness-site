@@ -44,7 +44,7 @@ export function FocusCard({ plan, sample = false }: { plan: PlanDraft; sample?: 
                 <td className={`py-2 pr-3 text-right font-semibold ${a.passed ? "text-ink" : "text-bad"}`}>{a.points}</td>
                 <td className="py-2 pr-3">{a.passed ? "Met" : <span className="text-bad">Below minimum</span>}</td>
                 <td className="py-2">
-                  <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${a.role === "develop" ? "bg-accent/15 text-accent" : "bg-surface-2 text-ink-2"}`}>
+                  <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${a.role === "develop" ? "bg-accent/15 text-accent-ink" : "bg-surface-2 text-ink-2"}`}>
                     {a.role === "develop" ? `Focus ${a.priority ?? ""}`.trim() : "Maintain"}
                   </span>
                 </td>

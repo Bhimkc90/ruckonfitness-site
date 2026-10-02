@@ -81,8 +81,8 @@ export function SdcLaneDiagram() {
         </g>
       ))}
       {/* Start and 25 m lines */}
-      <line x1={laneX - 4} x2={laneX + laneW * 2 + 4} y1={start} y2={start} className="stroke-accent" strokeWidth={3} />
-      <line x1={laneX - 4} x2={laneX + laneW * 2 + 4} y1={line25} y2={line25} className="stroke-accent" strokeWidth={3} />
+      <line x1={laneX - 4} x2={laneX + laneW * 2 + 4} y1={start} y2={start} className="stroke-accent-ink" strokeWidth={3} />
+      <line x1={laneX - 4} x2={laneX + laneW * 2 + 4} y1={line25} y2={line25} className="stroke-accent-ink" strokeWidth={3} />
       <text x={laneX - 6} y={start + 4} textAnchor="end" fontSize={11} className={strong}>
         Start
       </text>
@@ -184,8 +184,8 @@ export function SdcSequenceDiagram() {
       <text x={x25} y={20} textAnchor="middle" fontSize={11} className={strong}>
         25 m line
       </text>
-      <line x1={x0} x2={x0} y1={26} y2={top + rowH * 5 - 10} className="stroke-accent" strokeWidth={2.5} />
-      <line x1={x25} x2={x25} y1={26} y2={top + rowH * 5 - 10} className="stroke-accent" strokeWidth={2.5} />
+      <line x1={x0} x2={x0} y1={26} y2={top + rowH * 5 - 10} className="stroke-accent-ink" strokeWidth={2.5} />
+      <line x1={x25} x2={x25} y1={26} y2={top + rowH * 5 - 10} className="stroke-accent-ink" strokeWidth={2.5} />
       <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
           <path d="M0 0 L10 5 L0 10 z" className="fill-ink-2" />
@@ -243,8 +243,8 @@ export function FieldOverviewDiagram() {
       {Array.from({ length: lanes - 1 }, (_, i) => (
         <line key={i} x1={left + laneW * (i + 1)} x2={left + laneW * (i + 1)} y1={top} y2={top + length} className="stroke-line-strong" strokeWidth={0.75} />
       ))}
-      <line x1={left} x2={left + laneW * lanes} y1={startY} y2={startY} className="stroke-accent" strokeWidth={2} />
-      <line x1={left} x2={left + laneW * lanes} y1={line25} y2={line25} className="stroke-accent" strokeWidth={2} />
+      <line x1={left} x2={left + laneW * lanes} y1={startY} y2={startY} className="stroke-accent-ink" strokeWidth={2} />
+      <line x1={left} x2={left + laneW * lanes} y1={line25} y2={line25} className="stroke-accent-ink" strokeWidth={2} />
       <text x={left + (laneW * lanes) / 2} y={startY + 18} textAnchor="middle" fontSize={10} className={strong}>
         Start / finish line
       </text>
@@ -298,7 +298,7 @@ export function DeadliftPositionDiagram() {
     >
       <line x1={10} x2={350} y1={130} y2={130} className="stroke-line-strong" />
       {/* Start position: plate drawn first so the body reads in front of it */}
-      <circle cx={140} cy={114} r={16} className="fill-none stroke-accent" strokeOpacity={0.55} strokeWidth={2} strokeDasharray="4 3" />
+      <circle cx={140} cy={114} r={16} className="fill-none stroke-accent-ink" strokeOpacity={0.55} strokeWidth={2} strokeDasharray="4 3" />
       <g className={limb} strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" fill="none">
         <path d="M112 130 L132 130" />
         <path d="M118 129 L132 102" />
@@ -315,7 +315,7 @@ export function DeadliftPositionDiagram() {
         hips below shoulders, heels down
       </text>
       {/* Top position */}
-      <circle cx={265} cy={82} r={16} className="fill-none stroke-accent" strokeOpacity={0.55} strokeWidth={2} strokeDasharray="4 3" />
+      <circle cx={265} cy={82} r={16} className="fill-none stroke-accent-ink" strokeOpacity={0.55} strokeWidth={2} strokeDasharray="4 3" />
       <g className={limb} strokeWidth={3.5} strokeLinecap="round" fill="none">
         <path d="M254 130 L272 130" />
         <path d="M262 130 L262 100 L262 72" />
@@ -376,7 +376,7 @@ export function HandReleasePositionDiagram() {
         <circle cx={270} cy={146} r={7} className="fill-ink" />
         <path d="M270 154 L270 188" className={limb} strokeWidth={4} strokeLinecap="round" />
         <path d="M270 188 L266 206 M270 188 L274 206" className={limb} strokeWidth={3} strokeLinecap="round" />
-        <path d="M210 160 L330 160" className="stroke-accent" strokeWidth={3} strokeLinecap="round" />
+        <path d="M210 160 L330 160" className="stroke-accent-ink" strokeWidth={3} strokeLinecap="round" />
         <text x={190} y={220} fontSize={10.5} className={strong}>4. Release: arms out in a T</text>
         <text x={190} y={233} fontSize={10.5} className={text}>(top view), then hands back</text>
       </g>
@@ -398,7 +398,7 @@ export function PlankPositionDiagram() {
       <path d="M230 71 L230 98 L276 98" className={limb} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx={244} cy={66} r={8} className="fill-ink" />
       <path d="M40 98 L34 100" className={limb} strokeWidth={3} strokeLinecap="round" />
-      <line x1={40} x2={232} y1={80} y2={52} className="stroke-accent" strokeDasharray="5 4" strokeWidth={1.5} />
+      <line x1={40} x2={232} y1={80} y2={52} className="stroke-accent-ink" strokeDasharray="5 4" strokeWidth={1.5} />
       <text x={60} y={46} fontSize={10.5} className={strong}>straight line head to heels</text>
       <text x={250} y={122} fontSize={10.5} className={text} textAnchor="middle">elbows under shoulders,</text>
       <text x={250} y={135} fontSize={10.5} className={text} textAnchor="middle">forearms flat</text>

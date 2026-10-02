@@ -27,9 +27,8 @@ import { TRAINING_PLANS_ENABLED } from "@/lib/features";
 import { Card, PageHeader } from "@/components/ui/Card";
 import { useToday } from "@/components/training/PlanParts";
 import { ButtonLink, buttonClass } from "@/components/ui/Button";
+import { inputClass } from "@/components/ui/form";
 
-const inputClass =
-  "mt-1.5 w-full rounded-lg border border-line-strong bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-2/60 focus:border-accent focus:outline-none";
 
 type Notice = { kind: "saved" | "deleted" | "error"; message: string } | null;
 
@@ -39,7 +38,7 @@ export default function ProfileEditor() {
   const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
 
-  if (!hydrated) return <div className="h-60 rounded-xl border border-line bg-surface" aria-busy="true" aria-label="Loading profile" />;
+  if (!hydrated) return <div className="h-60 rounded-xl border border-card-line bg-surface shadow-sm" aria-busy="true" aria-label="Loading profile" />;
 
   const showForm = editing || !profile;
 
@@ -62,7 +61,7 @@ export default function ProfileEditor() {
       />
 
       <p className="flex gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink-2">
-        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-ink" aria-hidden />
         Your profile stays in this browser only. It doesn&apos;t sync across devices and isn&apos;t sent anywhere. RuckOn doesn&apos;t ask for
         military identifiers, diagnoses, or medical documents.
       </p>
@@ -185,7 +184,7 @@ function ProfileSummary({ profile, onNotice }: { profile: SoldierProfile; onNoti
         <Card title="How your profile is used">
           <ul className="list-disc space-y-1.5 pl-5 text-sm text-ink">
             <li>
-              <Link href="/aft-calculator" className="text-accent hover:underline">
+              <Link href="/aft-calculator" className="text-accent-ink hover:underline">
                 Record AFT
               </Link>{" "}
               starts with your age on the test date, standard, and score table. You can change them for any single test.
@@ -323,7 +322,7 @@ function ProfileForm({ profile, onSaved, onCancel }: { profile: SoldierProfile |
                     type="checkbox"
                     checked={values.weekdays.includes(d)}
                     onChange={() => set("weekdays", toggle<WeekdayId>(values.weekdays, d))}
-                    className="accent-[var(--color-accent)]"
+                    className="accent-[var(--color-control)]"
                   />
                   {weekdayLabels[d].slice(0, 3)}
                 </label>
@@ -336,7 +335,7 @@ function ProfileForm({ profile, onSaved, onCancel }: { profile: SoldierProfile |
             <div className="mt-2 flex flex-wrap gap-4">
               {([30, 45, 60] as SessionMinutes[]).map((m) => (
                 <label key={m} className="flex items-center gap-2">
-                  <input type="radio" name="minutes" checked={values.sessionMinutes === m} onChange={() => set("sessionMinutes", m)} className="accent-[var(--color-accent)]" />
+                  <input type="radio" name="minutes" checked={values.sessionMinutes === m} onChange={() => set("sessionMinutes", m)} className="accent-[var(--color-control)]" />
                   {m} min
                 </label>
               ))}
@@ -355,7 +354,7 @@ function ProfileForm({ profile, onSaved, onCancel }: { profile: SoldierProfile |
                 ["No", false],
               ].map(([label, value]) => (
                 <label key={String(label)} className="flex items-center gap-2">
-                  <input type="radio" name="running-access" checked={values.runningAccess === value} onChange={() => set("runningAccess", value as boolean)} className="accent-[var(--color-accent)]" />
+                  <input type="radio" name="running-access" checked={values.runningAccess === value} onChange={() => set("runningAccess", value as boolean)} className="accent-[var(--color-control)]" />
                   {label}
                 </label>
               ))}
@@ -375,7 +374,7 @@ function ProfileForm({ profile, onSaved, onCancel }: { profile: SoldierProfile |
                     type="checkbox"
                     checked={!!values.equipment?.includes(o.value)}
                     onChange={() => set("equipment", toggle(values.equipment ?? [], o.value))}
-                    className="accent-[var(--color-accent)]"
+                    className="accent-[var(--color-control)]"
                   />
                   {o.label}
                 </label>
@@ -385,7 +384,7 @@ function ProfileForm({ profile, onSaved, onCancel }: { profile: SoldierProfile |
                   type="checkbox"
                   checked={values.equipment !== null && values.equipment.length === 0}
                   onChange={() => set("equipment", values.equipment !== null && values.equipment.length === 0 ? null : [])}
-                  className="accent-[var(--color-accent)]"
+                  className="accent-[var(--color-control)]"
                 />
                 No equipment
               </label>
@@ -396,7 +395,7 @@ function ProfileForm({ profile, onSaved, onCancel }: { profile: SoldierProfile |
             <div className="mt-2 space-y-1.5">
               {experienceOptions.map((o) => (
                 <label key={o.value} className="flex items-start gap-2">
-                  <input type="radio" name="experience" checked={values.experience === o.value} onChange={() => set("experience", o.value)} className="mt-1 accent-[var(--color-accent)]" />
+                  <input type="radio" name="experience" checked={values.experience === o.value} onChange={() => set("experience", o.value)} className="mt-1 accent-[var(--color-control)]" />
                   <span>
                     {o.label}
                     <span className="block text-xs text-ink-2">{o.hint}</span>
@@ -420,7 +419,7 @@ function ProfileForm({ profile, onSaved, onCancel }: { profile: SoldierProfile |
             <div className="mt-2 space-y-1.5">
               {restrictionOptions.map((o) => (
                 <label key={o.value} className="flex items-start gap-2">
-                  <input type="checkbox" checked={values.restrictions.includes(o.value)} onChange={() => set("restrictions", toggle(values.restrictions, o.value))} className="mt-1 accent-[var(--color-accent)]" />
+                  <input type="checkbox" checked={values.restrictions.includes(o.value)} onChange={() => set("restrictions", toggle(values.restrictions, o.value))} className="mt-1 accent-[var(--color-control)]" />
                   {o.label}
                 </label>
               ))}

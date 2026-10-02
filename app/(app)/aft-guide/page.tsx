@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, ClipboardList, Ruler } from "lucide-react";
+import { ArrowRight, ClipboardList, Link2, Ruler } from "lucide-react";
 import { aftEvents, aftGuideHref } from "@/lib/aft/events";
 import { GUIDE_VERIFIED_ON } from "@/lib/aft/guideSources";
 import { sequence, standards, testOverview } from "@/lib/aft/fieldSetup";
@@ -9,6 +9,8 @@ import { ButtonLink } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/Card";
 import { CitedList, EndorsementNote, GuideSection, GuideSourceList, Ref } from "@/components/aft-guide/GuideBits";
 import { FieldOverviewDiagram } from "@/components/aft-guide/Diagrams";
+import EventGuide, { EventSectionNav } from "@/components/aft-guide/EventGuide";
+import EventSelector from "@/components/aft-guide/EventSelector";
 
 export const metadata: Metadata = {
   title: "AFT Guide",
@@ -31,33 +33,43 @@ export default function AftGuidePage() {
         }
       />
 
-      <section aria-labelledby="events-heading">
-        <h2 id="events-heading" className="sr-only">
-          Events
+      <section aria-labelledby="events-heading" className="space-y-3">
+        <h2 id="events-heading" className="text-lg font-bold text-ink">
+          Choose an event
         </h2>
-        <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {aftEvents.map((event) => (
-            <li key={event.code}>
-              <Link
-                href={aftGuideHref(event.slug)}
-                className="flex h-full flex-col rounded-xl border border-line bg-surface p-4 transition-colors hover:border-line-strong hover:bg-surface-2/60"
-              >
-                <span className="text-xs font-medium text-accent">Event {event.order}</span>
-                <span className="mt-1 font-semibold text-ink">{event.name}</span>
-                <span className="mt-1 text-sm text-ink-2">{event.description}</span>
-                <span className="mt-auto pt-3 text-xs text-ink-2">Score: {event.rawScoreLabel}</span>
-              </Link>
-            </li>
+        <EventSelector
+          events={aftEvents.map((e) => ({ slug: e.slug, order: e.order ?? 0, name: e.name, shortName: e.shortName, scoreLabel: e.rawScoreLabel }))}
+          panels={aftEvents.map((event) => (
+            <div key={event.slug} className="space-y-5">
+              <header className="rounded-xl border-2 border-ink bg-surface p-4 shadow-sm sm:p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-accent-ink">Event {event.order} of 5</p>
+                <h2 id={`event-${event.slug}-title`} tabIndex={-1} className="mt-1 scroll-mt-32 text-2xl font-bold tracking-tight text-ink lg:scroll-mt-6">
+                  {event.name}
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm text-ink-2">{event.description}</p>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <ButtonLink href="/aft-calculator">Score it in the calculator</ButtonLink>
+                  <Link href={aftGuideHref(event.slug)} className="inline-flex items-center gap-1 text-sm font-semibold text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink">
+                    <Link2 className="h-4 w-4" aria-hidden />
+                    Direct link to this event
+                  </Link>
+                </div>
+                <div className="mt-4 border-t border-line pt-3">
+                  <EventSectionNav idPrefix={`${event.slug}-`} />
+                </div>
+              </header>
+              <EventGuide event={event} idPrefix={`${event.slug}-`} level={3} />
+            </div>
           ))}
-        </ol>
+        />
       </section>
 
       <section
         aria-labelledby="field-setup-heading"
-        className="grid gap-5 rounded-xl border border-accent/40 bg-surface p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center"
+        className="grid gap-5 rounded-xl border border-card-line bg-surface p-4 shadow-sm sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center"
       >
         <div>
-          <p className="inline-flex items-center gap-1.5 text-xs font-medium text-accent">
+          <p className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-ink">
             <Ruler className="h-3.5 w-3.5" aria-hidden />
             For OICs, NCOICs, and graders
           </p>
@@ -83,7 +95,7 @@ export default function AftGuidePage() {
         <GuideSection title="Standards">
           <CitedList items={standards} />
           <p className="mt-4 text-sm">
-            <Link href="/aft-calculator" className="font-medium text-accent hover:underline">
+            <Link href="/aft-calculator" className="font-medium text-accent-ink hover:underline">
               Score a test in the calculator
             </Link>
           </p>
@@ -107,11 +119,11 @@ export default function AftGuidePage() {
         <Ref>ATP 7-22.01 (12 Mar 2026), paras 2-26 – 2-40, 2-75, pp. 22–25, 36</Ref>
         <p className="mt-3 text-sm text-ink-2">
           Practice the{" "}
-          <Link href={drillHref("preparation-drill")} className="text-accent hover:underline">
+          <Link href={drillHref("preparation-drill")} className="text-accent-ink hover:underline">
             Preparation Drill
           </Link>{" "}
           and{" "}
-          <Link href={drillHref("recovery-drill")} className="text-accent hover:underline">
+          <Link href={drillHref("recovery-drill")} className="text-accent-ink hover:underline">
             Recovery Drill
           </Link>{" "}
           in the workout library.

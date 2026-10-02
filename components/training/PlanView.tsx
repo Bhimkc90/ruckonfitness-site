@@ -21,6 +21,7 @@ import { ButtonLink, buttonClass } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/StatusBadge";
 import { PlanDisclaimer, useToday } from "./PlanParts";
 import { FocusCard, NotesCard, SessionBody } from "./PlanPreview";
+import { inputClass } from "@/components/ui/form";
 
 const difficultyLabels: Record<Difficulty, string> = {
   easy: "Easy",
@@ -36,7 +37,7 @@ export default function PlanView() {
   const results = useAftResults();
   const plan = activePlan(data);
 
-  if (!hydrated || !today) return <div className="h-40 rounded-xl border border-line bg-surface" aria-busy="true" aria-label="Loading plan" />;
+  if (!hydrated || !today) return <div className="h-40 rounded-xl border border-card-line bg-surface shadow-sm" aria-busy="true" aria-label="Loading plan" />;
 
   if (!plan) {
     const ended = data.plans.filter((p) => p.status === "ended").length;
@@ -137,7 +138,7 @@ function ActivePlan({ plan, completions, today }: { plan: StoredPlan; completion
               <p className="text-sm text-ink-2">
                 {next.date === today ? "Today" : formatTestDate(next.date)} · about {next.session.estimatedMinutes} min
               </p>
-              <a href={`#session-${next.session.id}`} className="mt-2 inline-block text-sm font-medium text-accent hover:underline">
+              <a href={`#session-${next.session.id}`} className="mt-2 inline-block text-sm font-medium text-accent-ink hover:underline">
                 Open workout
               </a>
             </>
@@ -157,7 +158,7 @@ function ActivePlan({ plan, completions, today }: { plan: StoredPlan; completion
         const held = progressionHeld(plan, completions, w);
         const range = weekWindow(plan.startDate, w);
         return (
-          <section key={w} aria-labelledby={`week-${w}`} className="rounded-xl border border-line bg-surface p-4 sm:p-5">
+          <section key={w} aria-labelledby={`week-${w}`} className="rounded-xl border border-card-line bg-surface shadow-sm p-4 sm:p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 id={`week-${w}`} className="text-base font-semibold text-ink">
                 Week {w} <span className="font-normal text-ink-2">· {w <= 2 ? "Foundation" : held ? "Holding at the foundation level" : "Build"}</span>
@@ -259,7 +260,7 @@ function SessionRow({
           </span>
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-              completion ? "bg-good/10 text-good" : status === "Today" ? "bg-accent/15 text-accent" : "bg-surface-2 text-ink-2"
+              completion ? "bg-good/10 text-good" : status === "Today" ? "bg-accent/15 text-accent-ink" : "bg-surface-2 text-ink-2"
             }`}
           >
             {completion && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />}
@@ -293,14 +294,14 @@ function SessionRow({
                 <div className="mt-2 flex flex-wrap gap-2">
                   {(Object.keys(difficultyLabels) as Difficulty[]).map((d) => (
                     <label key={d} className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 ${difficulty === d ? "border-accent" : "border-line"}`}>
-                      <input type="radio" name={`difficulty-${session.id}`} checked={difficulty === d} onChange={() => setDifficulty(d)} className="accent-[var(--color-accent)]" />
+                      <input type="radio" name={`difficulty-${session.id}`} checked={difficulty === d} onChange={() => setDifficulty(d)} className="accent-[var(--color-control)]" />
                       {difficultyLabels[d]}
                     </label>
                   ))}
                 </div>
               </fieldset>
               <label className="mt-3 flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={pain} onChange={() => setPain(!pain)} className="accent-[var(--color-accent)]" />
+                <input type="checkbox" checked={pain} onChange={() => setPain(!pain)} className="accent-[var(--color-control)]" />
                 I had pain during or after this session
               </label>
               <label className="mt-3 block text-sm">
@@ -310,7 +311,7 @@ function SessionRow({
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
                   maxLength={500}
-                  className="mt-1 w-full rounded-lg border border-line-strong bg-canvas px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+                  className={inputClass}
                 />
               </label>
               <button type="button" onClick={save} disabled={!difficulty} className={buttonClass("primary", "mt-3")}>

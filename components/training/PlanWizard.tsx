@@ -27,11 +27,10 @@ import { PassFailBadge } from "@/components/ui/StatusBadge";
 import { PlanDisclaimer, useToday } from "./PlanParts";
 import PlanPreview from "./PlanPreview";
 import { equipmentOptions, experienceOptions, restrictionOptions, runningOptions } from "@/lib/training/options";
+import { inputClass } from "@/components/ui/form";
 
 type Step = "baseline" | "screening" | "preferences" | "review";
 
-const inputClass =
-  "mt-1.5 w-full rounded-lg border border-line-strong bg-canvas px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none";
 
 // Answers the AFT score cannot establish start unanswered so the user has to choose them.
 const initialPrefs: PreferenceAnswers = {
@@ -68,7 +67,7 @@ export default function PlanWizard() {
   const [acknowledged, setAcknowledged] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  if (!hydrated || !today) return <div className="h-40 rounded-xl border border-line bg-surface" aria-busy="true" aria-label="Loading" />;
+  if (!hydrated || !today) return <div className="h-40 rounded-xl border border-card-line bg-surface shadow-sm" aria-busy="true" aria-label="Loading" />;
 
   if (saved.length === 0) {
     return (
@@ -146,7 +145,7 @@ export default function PlanWizard() {
               {saved.map((r) => (
                 <li key={r.id}>
                   <label className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm ${r.id === selectedId ? "border-accent" : "border-line"}`}>
-                    <input type="radio" name="baseline" value={r.id} checked={r.id === selectedId} onChange={() => setBaselineId(r.id)} className="accent-[var(--color-accent)]" />
+                    <input type="radio" name="baseline" value={r.id} checked={r.id === selectedId} onChange={() => setBaselineId(r.id)} className="accent-[var(--color-control)]" />
                     <span className="flex-1">
                       <span className="font-medium text-ink">{formatTestDate(r.testDate)}</span>
                       <span className="block text-xs text-ink-2">{describeCategory(categoryOf(r.result))}</span>
@@ -181,7 +180,7 @@ export default function PlanWizard() {
                     name="pain"
                     checked={screening.currentPain === value}
                     onChange={() => setScreening((s) => ({ ...s, currentPain: value as boolean }))}
-                    className="accent-[var(--color-accent)]"
+                    className="accent-[var(--color-control)]"
                   />
                   {label === "no" ? "No" : "Yes"}
                 </label>
@@ -244,7 +243,7 @@ export default function PlanWizard() {
               <div className="mt-2 flex gap-4">
                 {([30, 45, 60] as SessionMinutes[]).map((m) => (
                   <label key={m} className="flex items-center gap-2">
-                    <input type="radio" name="minutes" checked={prefs.sessionMinutes === m} onChange={() => set("sessionMinutes", m)} className="accent-[var(--color-accent)]" />
+                    <input type="radio" name="minutes" checked={prefs.sessionMinutes === m} onChange={() => set("sessionMinutes", m)} className="accent-[var(--color-control)]" />
                     {m} min
                   </label>
                 ))}
@@ -261,7 +260,7 @@ export default function PlanWizard() {
                       type="checkbox"
                       checked={prefs.weekdays.includes(d)}
                       onChange={() => set("weekdays", toggle<WeekdayId>(prefs.weekdays, d))}
-                      className="accent-[var(--color-accent)]"
+                      className="accent-[var(--color-control)]"
                     />
                     {weekdayLabels[d].slice(0, 3)}
                   </label>
@@ -279,7 +278,7 @@ export default function PlanWizard() {
                       type="checkbox"
                       checked={!!prefs.equipment?.includes(o.value)}
                       onChange={() => set("equipment", toggle(prefs.equipment ?? [], o.value))}
-                      className="accent-[var(--color-accent)]"
+                      className="accent-[var(--color-control)]"
                     />
                     {o.label}
                   </label>
@@ -289,7 +288,7 @@ export default function PlanWizard() {
                     type="checkbox"
                     checked={prefs.equipment !== null && prefs.equipment.length === 0}
                     onChange={() => set("equipment", prefs.equipment !== null && prefs.equipment.length === 0 ? null : [])}
-                    className="accent-[var(--color-accent)]"
+                    className="accent-[var(--color-control)]"
                   />
                   No equipment
                 </label>
@@ -305,7 +304,7 @@ export default function PlanWizard() {
                   ["No", false],
                 ].map(([label, value]) => (
                   <label key={String(label)} className="flex items-center gap-2">
-                    <input type="radio" name="running-access" checked={prefs.runningAccess === value} onChange={() => set("runningAccess", value as boolean)} className="accent-[var(--color-accent)]" />
+                    <input type="radio" name="running-access" checked={prefs.runningAccess === value} onChange={() => set("runningAccess", value as boolean)} className="accent-[var(--color-control)]" />
                     {label}
                   </label>
                 ))}
@@ -318,7 +317,7 @@ export default function PlanWizard() {
               <div className="mt-2 space-y-1.5">
                 {experienceOptions.map((o) => (
                   <label key={o.value} className="flex items-start gap-2">
-                    <input type="radio" name="experience" checked={prefs.experience === o.value} onChange={() => set("experience", o.value)} className="mt-1 accent-[var(--color-accent)]" />
+                    <input type="radio" name="experience" checked={prefs.experience === o.value} onChange={() => set("experience", o.value)} className="mt-1 accent-[var(--color-control)]" />
                     <span>
                       {o.label}
                       <span className="block text-xs text-ink-2">{o.hint}</span>
@@ -349,7 +348,7 @@ export default function PlanWizard() {
               <div className="mt-2 space-y-1.5">
                 {restrictionOptions.map((o) => (
                   <label key={o.value} className="flex items-start gap-2">
-                    <input type="checkbox" checked={prefs.restrictions.includes(o.value)} onChange={() => set("restrictions", toggle(prefs.restrictions, o.value))} className="mt-1 accent-[var(--color-accent)]" />
+                    <input type="checkbox" checked={prefs.restrictions.includes(o.value)} onChange={() => set("restrictions", toggle(prefs.restrictions, o.value))} className="mt-1 accent-[var(--color-control)]" />
                     {o.label}
                   </label>
                 ))}
@@ -366,7 +365,7 @@ export default function PlanWizard() {
           </div>
           {prefill.fields > 0 && (
             <label className="mt-5 flex items-start gap-2 text-sm">
-              <input type="checkbox" checked={prefsConfirmed} onChange={() => setPrefsConfirmed(!prefsConfirmed)} className="mt-1 accent-[var(--color-accent)]" />
+              <input type="checkbox" checked={prefsConfirmed} onChange={() => setPrefsConfirmed(!prefsConfirmed)} className="mt-1 accent-[var(--color-control)]" />
               I&apos;ve checked these preferences and they are current.
             </label>
           )}
@@ -419,7 +418,7 @@ export default function PlanWizard() {
                   )}
                 </div>
                 <label className="mt-4 flex items-start gap-2 text-sm">
-                  <input type="checkbox" checked={acknowledged} onChange={() => setAcknowledged(!acknowledged)} className="mt-1 accent-[var(--color-accent)]" />
+                  <input type="checkbox" checked={acknowledged} onChange={() => setAcknowledged(!acknowledged)} className="mt-1 accent-[var(--color-control)]" />
                   I understand this is a general suggestion that has not been professionally reviewed, and that I should stop and seek advice if I have pain.
                 </label>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -456,7 +455,7 @@ export default function PlanWizard() {
 
 function Required({ show }: { show: boolean }) {
   if (!show) return null;
-  return <span className="ml-1 text-xs font-medium text-accent">Required</span>;
+  return <span className="ml-1 text-xs font-medium text-accent-ink">Required</span>;
 }
 
 function StepButtons({ back, next, disabled, nextLabel = "Continue" }: { back?: () => void; next?: () => void; disabled?: boolean; nextLabel?: string }) {

@@ -23,9 +23,8 @@ import type { AftEventCode } from "@/lib/aft/types";
 import { formatTestDate } from "@/lib/aft/format";
 import { Card } from "@/components/ui/Card";
 import { buttonClass } from "@/components/ui/Button";
+import { inputClass } from "@/components/ui/form";
 
-const inputClass =
-  "mt-1.5 w-full rounded-lg border border-line-strong bg-canvas px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none";
 
 type Notice = { kind: "ok" | "error"; message: string } | null;
 
@@ -58,7 +57,7 @@ function useExport(appVersion: string) {
 
 export default function SettingsPanel({ appVersion }: { appVersion: string }) {
   const hydrated = useHydrated();
-  if (!hydrated) return <div className="h-60 rounded-xl border border-line bg-surface" aria-busy="true" aria-label="Loading settings" />;
+  if (!hydrated) return <div className="h-60 rounded-xl border border-card-line bg-surface shadow-sm" aria-busy="true" aria-label="Loading settings" />;
   return (
     <div className="space-y-5">
       <PreferencesCard />
@@ -115,7 +114,7 @@ function PreferencesCard() {
                   name="trend-view"
                   checked={settings.trendView === value}
                   onChange={() => update({ trendView: value }, "Trend view")}
-                  className="accent-[var(--color-accent)]"
+                  className="accent-[var(--color-control)]"
                 />
                 {label}
               </label>
@@ -139,7 +138,7 @@ function PreferencesCard() {
           <p className="text-ink-2">Units and theme</p>
           <p className="mt-1.5 text-ink">
             Results use the official units from the Army score tables: pounds, repetitions, and minutes:seconds. They can&apos;t be changed, so
-            scores always match the tables. RuckOn uses a dark theme, with a light reading surface in the workout library.
+            scores always match the tables. RuckOn uses one theme: light pages with dark navigation.
           </p>
         </div>
       </div>
@@ -159,7 +158,7 @@ function ProfileCard() {
     <Card id="profile" title="Profile and training preferences">
       <p className="text-sm text-ink">
         Date of birth, AFT standard, score table, and training preferences are kept in your{" "}
-        <Link href="/profile" className="text-accent underline">
+        <Link href="/profile" className="text-accent-ink underline">
           profile
         </Link>
         .
@@ -289,7 +288,7 @@ function DataCard({ appVersion }: { appVersion: string }) {
         <div className="rounded-lg border border-line p-4">
           <h3 className="text-sm font-semibold text-ink">Import a backup</h3>
           <p className="mt-1 text-sm text-ink-2">You&apos;ll see what will change and choose merge or replace before anything is saved.</p>
-          <label htmlFor={fileId} className={buttonClass("secondary", "mt-3 cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-accent")}>
+          <label htmlFor={fileId} className={buttonClass("secondary", "mt-3 cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-focus")}>
             <FileUp className="h-4 w-4" aria-hidden />
             Choose backup file
             <input
@@ -321,14 +320,14 @@ function DataCard({ appVersion }: { appVersion: string }) {
             <legend className="text-ink-2">How to import</legend>
             <div className="mt-2 space-y-2">
               <label className="flex items-start gap-2">
-                <input type="radio" name="import-mode" checked={mode === "merge"} onChange={() => (setMode("merge"), setConfirmed(false))} className="mt-1 accent-[var(--color-accent)]" />
+                <input type="radio" name="import-mode" checked={mode === "merge"} onChange={() => (setMode("merge"), setConfirmed(false))} className="mt-1 accent-[var(--color-control)]" />
                 <span>
                   <span className="font-medium text-ink">Merge</span>
                   <span className="block text-xs text-ink-2">Add records that aren&apos;t here yet. Nothing in this browser is overwritten or removed.</span>
                 </span>
               </label>
               <label className="flex items-start gap-2">
-                <input type="radio" name="import-mode" checked={mode === "replace"} onChange={() => (setMode("replace"), setConfirmed(false))} className="mt-1 accent-[var(--color-accent)]" />
+                <input type="radio" name="import-mode" checked={mode === "replace"} onChange={() => (setMode("replace"), setConfirmed(false))} className="mt-1 accent-[var(--color-control)]" />
                 <span>
                   <span className="font-medium text-ink">Replace</span>
                   <span className="block text-xs text-ink-2">Remove all RuckOn data in this browser and use the backup&apos;s data instead.</span>
@@ -376,7 +375,7 @@ function DataCard({ appVersion }: { appVersion: string }) {
 
           {needsConfirm && (
             <label className="mt-3 flex items-start gap-2 text-sm">
-              <input type="checkbox" checked={confirmed} onChange={() => setConfirmed(!confirmed)} className="mt-1 accent-[var(--color-accent)]" />
+              <input type="checkbox" checked={confirmed} onChange={() => setConfirmed(!confirmed)} className="mt-1 accent-[var(--color-control)]" />
               I understand that replacing removes the data now in this browser.
             </label>
           )}

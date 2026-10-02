@@ -21,6 +21,7 @@ import {
 } from "@/lib/library";
 import { CATEGORY_NOTE, filterSections, librarySections, matchingExerciseCount, type LibrarySection } from "@/lib/library/sections";
 import { buttonClass } from "@/components/ui/Button";
+import { fieldFocus } from "@/components/ui/form";
 import { Tag } from "./LibraryBits";
 import { DemonstrationNote, ExecutionDetails, FormGuidance, hasFormGuidance } from "./ExerciseDetail";
 import { FIGURE_READING_NOTE, FigureList } from "./FigureGallery";
@@ -31,7 +32,7 @@ import { figuresInDrill } from "@/lib/library/images";
 const SECTIONS = librarySections();
 
 const selectClass =
-  "mt-1 w-full rounded-lg border border-line-strong bg-surface px-2.5 py-1.5 text-sm text-ink focus:border-ink";
+  `mt-1 w-full rounded-lg border border-line-strong bg-surface px-2.5 py-1.5 text-sm text-ink ${fieldFocus}`;
 
 const filterLabels: Record<Exclude<keyof LibraryFilters, "query">, string> = {
   drill: "Drill",
@@ -82,7 +83,7 @@ export default function LibraryBrowser() {
                 value={filters.query}
                 onChange={(e) => set("query", e.target.value)}
                 placeholder="Exercise, drill, or body area"
-                className="w-full rounded-lg border border-line-strong bg-surface py-1.5 pl-8 pr-2.5 text-sm text-ink placeholder:text-ink-2/70 focus:border-ink"
+                className={`w-full rounded-lg border border-line-strong bg-surface py-1.5 pl-8 pr-2.5 text-sm text-ink placeholder:text-ink-2/70 ${fieldFocus}`}
               />
             </span>
           </label>

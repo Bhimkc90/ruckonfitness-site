@@ -1,6 +1,7 @@
-// Official sources for the AFT Guide, checked against the publications on 2026-09-30.
+// Official sources for the AFT Guide. Last checked 2026-10-02: the ATP 7-22.01 PDF on armypubs was unchanged
+// (same file as checked 2026-09-30), and army.mil/aft still listed the same publications, score tables, and videos.
 
-export const GUIDE_VERIFIED_ON = "2026-09-30";
+export const GUIDE_VERIFIED_ON = "2026-10-02";
 
 export const guideSources = {
   atp72201: {
@@ -35,7 +36,7 @@ export const guideSources = {
     id: "armyAftSite",
     number: "army.mil/aft",
     title: "Army Fitness Test website",
-    date: "Checked 30 September 2026",
+    date: "Checked 2 October 2026",
     url: "https://www.army.mil/aft/",
     status: "The ATP names this site for event descriptions and instructional videos.",
     distribution: "Public website.",

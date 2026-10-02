@@ -9,7 +9,7 @@ import { describeCategory, describeRawChange, formatRaw, formatSignedPoints, for
 import { deleteAftResult, useAftResults, useHydrated } from "@/lib/storage/aftResults";
 import { Card } from "@/components/ui/Card";
 import { ButtonLink } from "@/components/ui/Button";
-import { Chip, PassFailBadge } from "@/components/ui/StatusBadge";
+import { Chip, PassFailBadge, EventPoints } from "@/components/ui/StatusBadge";
 import Link from "next/link";
 import { TRAINING_PLANS_ENABLED } from "@/lib/features";
 
@@ -45,7 +45,7 @@ export default function ScoreHistory() {
   );
 
   if (!hydrated) {
-    return <div className="h-40 rounded-xl border border-line bg-surface" aria-busy="true" aria-label="Loading history" />;
+    return <div className="h-40 rounded-xl border border-card-line bg-surface shadow-sm" aria-busy="true" aria-label="Loading history" />;
   }
 
   if (progress.length === 0) {
@@ -76,7 +76,7 @@ function HistoryEntry({ item }: { item: TestProgress }) {
   const rule = aftStandardRules[result.standard];
 
   return (
-    <article id={`result-${record.id}`} className="scroll-mt-28 rounded-xl border border-line bg-surface p-4 sm:p-5 lg:scroll-mt-6">
+    <article id={`result-${record.id}`} className="scroll-mt-28 rounded-xl border border-card-line bg-surface shadow-sm p-4 sm:p-5 lg:scroll-mt-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold text-ink">{testLabel(item)}</h2>
@@ -133,7 +133,6 @@ function HistoryEntry({ item }: { item: TestProgress }) {
           <tbody className="tabular-nums">
             {item.events.map((entry) => {
               const raw = entry.rawChange === null ? null : describeRawChange(entry.event, entry.rawChange);
-              const below = entry.points < rule.minEventPoints;
               return (
                 <tr key={entry.event} className="border-t border-line">
                   <td className="py-2 pr-3 text-ink">{aftEventInfo[entry.event].name}</td>
@@ -145,8 +144,8 @@ function HistoryEntry({ item }: { item: TestProgress }) {
                   >
                     {raw ? raw.text : "—"}
                   </td>
-                  <td className={`py-2 pr-3 text-right font-semibold ${below ? "text-bad" : "text-ink"}`}>
-                    {entry.points}
+                  <td className="py-2 pr-3 text-right font-semibold">
+                    <EventPoints points={entry.points} minimum={rule.minEventPoints} />
                   </td>
                   <td className="py-2 text-right">
                     <PointsChange value={entry.pointsChange} />
@@ -162,7 +161,7 @@ function HistoryEntry({ item }: { item: TestProgress }) {
         <p className="text-xs text-ink-2">*Compared with the last test in the same scoring category.</p>
         <div className="flex items-center gap-2">
         {TRAINING_PLANS_ENABLED && (
-          <Link href={`/training-plan/new?baseline=${record.id}`} className="rounded-lg px-2 py-1 text-xs font-medium text-accent hover:bg-accent/10">
+          <Link href={`/training-plan/new?baseline=${record.id}`} className="rounded-lg px-2 py-1 text-xs font-medium text-accent-ink hover:bg-accent/10">
             Suggest training plan<span className="sr-only"> from {testLabel(item)}</span>
           </Link>
         )}

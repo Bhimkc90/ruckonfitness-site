@@ -43,7 +43,7 @@ export default async function DrillPage({ params }: { params: Promise<{ id: stri
       </nav>
 
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">
+        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
           {drill.name} <span className="font-normal text-ink-2">({drill.abbreviation})</span>
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-ink-2">{drill.summary}</p>

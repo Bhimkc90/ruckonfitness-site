@@ -153,11 +153,6 @@ export const aftEvents: AftEvent[] = [
     },
     media: { video: "https://www.youtube.com/watch?v=rTBrj1CuT8w" },
     video: { url: "https://www.youtube.com/watch?v=rTBrj1CuT8w", title: "ACFT Event 1 - 3 Repetition Maximum Deadlift", channel, note: OFFICIAL_VIDEO_NOTE },
-    officialFigures: [
-      { figure: "Figures 2-3 and 2-4", title: "Maximum Deadlift and proper technique", page: "27" },
-      { figure: "Figures 2-5 and 2-6", title: "Knees moving together; hips above shoulders or rounded spine", page: "28" },
-      { figure: "Figure 2-7", title: "Plates touching versus not touching the ground", page: "29" },
-    ],
     refs: {
       measures: atp01("2-41", "26"),
       equipment: atp01("2-21, Table 2-1; E-2 – E-8", "20–21, 87–89"),
@@ -269,7 +264,6 @@ export const aftEvents: AftEvent[] = [
     },
     media: { video: "https://www.youtube.com/watch?v=9mO6ygDS7y4" },
     video: { url: "https://www.youtube.com/watch?v=9mO6ygDS7y4", title: "ACFT Event 3 - Hand Release Pushup", channel, note: OFFICIAL_VIDEO_NOTE },
-    officialFigures: [{ figure: "Figures 2-8 and 2-9", title: "Hand-Release Push-Up and proper technique", page: "30" }],
     refs: {
       measures: atp01("2-56", "30"),
       equipment: atp01("2-22", "21"),
@@ -391,10 +385,6 @@ export const aftEvents: AftEvent[] = [
     },
     media: { video: "https://www.youtube.com/watch?v=Mv2T2bpbJpw" },
     video: { url: "https://www.youtube.com/watch?v=Mv2T2bpbJpw", title: "ACFT Event 4 Sprint Drag Carry", channel, note: OFFICIAL_VIDEO_NOTE },
-    officialFigures: [
-      { figure: "Figure 2-10", title: "Sprint-Drag-Carry", page: "33" },
-      { figure: "Figure 2-11", title: "Authorized strap handle grips", page: "33" },
-    ],
     refs: {
       measures: atp01("2-67", "33"),
       equipment: atp01("2-23; E-9 – E-14", "21–22, 89–90"),
@@ -496,7 +486,6 @@ export const aftEvents: AftEvent[] = [
     },
     media: { video: "https://www.youtube.com/watch?v=XuprZeJa7G0" },
     video: { url: "https://www.youtube.com/watch?v=XuprZeJa7G0", title: "ACFT Event 5 - Plank", channel, note: OFFICIAL_VIDEO_NOTE },
-    officialFigures: [{ figure: "Figure 2-12", title: "Plank", page: "35" }],
     refs: {
       measures: atp01("2-72", "35"),
       equipment: atp01("2-24", "22"),
@@ -589,7 +578,6 @@ export const aftEvents: AftEvent[] = [
     },
     media: { video: "https://www.youtube.com/watch?v=NRvQA5UXNMk" },
     video: { url: "https://www.youtube.com/watch?v=NRvQA5UXNMk", title: "AFT Event 6 - 2 Mile Run", channel, note: OFFICIAL_VIDEO_NOTE },
-    officialFigures: [{ figure: "Figure 2-13", title: "2-Mile Run", page: "37" }],
     refs: {
       measures: atp01("2-77", "37"),
       equipment: atp01("2-25, 2-75; E-1", "22, 36, 87"),

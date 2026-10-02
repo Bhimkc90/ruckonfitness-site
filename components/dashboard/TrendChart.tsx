@@ -20,10 +20,13 @@ export type TrendPoint = {
   details: string[];
 };
 
-const ACCENT = "#facc15";
-const SURFACE = "#1a1b1f";
-const GRID = "#2e3036";
-const AXIS_TEXT = "#b4b4bc";
+// Recharts writes these as SVG attributes, so they are literal values matching the light theme tokens: a black
+// line with yellow points outlined in black, so each point stays visible on white.
+const LINE = "#111111"; // --color-ink
+const POINT = "#facc15"; // --color-accent
+const GRID = "#e2e0d8"; // --color-line
+const MARKER = "#b9b5a9"; // --color-line-strong
+const AXIS_TEXT = "#4a4a50"; // --color-ink-2
 
 type Row = TrendPoint & Record<`s${number}`, number | undefined>;
 
@@ -41,7 +44,7 @@ function TooltipBox({
   const row = payload?.[0]?.payload;
   if (!active || !row) return null;
   return (
-    <div className="rounded-lg border border-line-strong bg-surface-2 px-3 py-2 text-xs shadow-lg">
+    <div className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-xs shadow-lg">
       <p className="font-semibold text-ink">{row.label}</p>
       <p className="mt-1 text-ink">
         {valueLabel}: <span className="font-semibold">{formatValue(row.value)}</span>
@@ -119,7 +122,7 @@ export default function TrendChart({
               <ReferenceLine
                 key={item.key}
                 x={item.key}
-                stroke="#3d4047"
+                stroke={MARKER}
                 label={{
                   value: item.label,
                   position: inRightHalf ? "insideTopRight" : "insideTopLeft",
@@ -131,7 +134,7 @@ export default function TrendChart({
           })}
           <Tooltip
             isAnimationActive={false}
-            cursor={{ stroke: "#3d4047", strokeWidth: 1 }}
+            cursor={{ stroke: MARKER, strokeWidth: 1 }}
             content={(props) => (
               <TooltipBox
                 active={props.active}
@@ -146,14 +149,14 @@ export default function TrendChart({
               key={segment}
               dataKey={`s${segment}`}
               type="linear"
-              stroke={ACCENT}
+              stroke={LINE}
               strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
               connectNulls={false}
               isAnimationActive={false}
-              dot={{ r: 4, fill: ACCENT, stroke: SURFACE, strokeWidth: 2 }}
-              activeDot={{ r: 6, fill: ACCENT, stroke: SURFACE, strokeWidth: 2 }}
+              dot={{ r: 4, fill: POINT, stroke: LINE, strokeWidth: 1.5 }}
+              activeDot={{ r: 6, fill: POINT, stroke: LINE, strokeWidth: 2 }}
             />
           ))}
         </LineChart>

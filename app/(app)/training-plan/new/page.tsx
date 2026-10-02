@@ -22,7 +22,7 @@ export default function NewTrainingPlanPage() {
         title="Suggest a training plan"
         description="A four-week starter plan built by fixed rules from your saved AFT result, schedule, and equipment. It's a general suggestion, not an Army program."
       />
-      <Suspense fallback={<div className="h-40 rounded-xl border border-line bg-surface" aria-busy="true" aria-label="Loading" />}>
+      <Suspense fallback={<div className="h-40 rounded-xl border border-card-line bg-surface shadow-sm" aria-busy="true" aria-label="Loading" />}>
         <PlanWizard />
       </Suspense>
     </div>

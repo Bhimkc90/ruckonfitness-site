@@ -25,7 +25,7 @@ function ItemName({ item }: { item: PlanItem }) {
   if (item.kind === "drill") {
     const drill = getDrill(item.drillId)!;
     return (
-      <Link href={drillHref(drill.id)} className="font-medium text-accent hover:underline">
+      <Link href={drillHref(drill.id)} className="font-medium text-accent-ink hover:underline">
         {drill.name}
       </Link>
     );
@@ -33,14 +33,14 @@ function ItemName({ item }: { item: PlanItem }) {
   if (item.kind === "exercise") {
     const exercise = getExercise(item.exerciseId)!;
     return (
-      <Link href={exerciseHref(exercise.id)} className="font-medium text-accent hover:underline">
+      <Link href={exerciseHref(exercise.id)} className="font-medium text-accent-ink hover:underline">
         {exercise.name}
       </Link>
     );
   }
   const activity = activities[item.activityId];
   return activity.link ? (
-    <Link href={activity.link} className="font-medium text-accent hover:underline">
+    <Link href={activity.link} className="font-medium text-accent-ink hover:underline">
       {activity.name}
     </Link>
   ) : (

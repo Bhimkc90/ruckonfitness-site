@@ -8,7 +8,7 @@ export default function Home() {
       <LandingRedirect />
       <p>
         Opening RuckOn Fitness…{" "}
-        <Link href="/dashboard" className="text-accent underline">
+        <Link href="/dashboard" className="text-accent-ink underline">
           Go to the dashboard
         </Link>
       </p>

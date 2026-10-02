@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Eye, Info } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, Info } from "lucide-react";
 import type { AftEventCode, AftStandard } from "@/lib/aft/types";
 import { scoreAft } from "@/lib/aft/scoring";
 import { aftStandardRules } from "@/lib/aft/rules";
@@ -21,6 +21,7 @@ import { Card } from "@/components/ui/Card";
 import { ButtonLink, buttonClass } from "@/components/ui/Button";
 import AftResultSummary from "./AftResultSummary";
 import { TRAINING_PLANS_ENABLED } from "@/lib/features";
+import { inputClass } from "@/components/ui/form";
 
 type SaveStatus =
   | { kind: "idle" }
@@ -28,8 +29,6 @@ type SaveStatus =
   | { kind: "duplicate"; id: string }
   | { kind: "error"; message: string };
 
-const inputClass =
-  "mt-1.5 w-full rounded-lg border border-line-strong bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-2/60 focus:border-accent focus:outline-none";
 
 export default function AftCalculator() {
   const profile = useProfile();
@@ -150,7 +149,7 @@ export default function AftCalculator() {
             {Object.keys(defaults).length > 0 ? (
               <>
                 Details marked &ldquo;From your profile&rdquo; are prefilled. Changing them applies to this test only; your{" "}
-                <Link href="/profile" className="text-accent underline">
+                <Link href="/profile" className="text-accent-ink underline">
                   profile
                 </Link>{" "}
                 isn&apos;t changed.
@@ -158,7 +157,7 @@ export default function AftCalculator() {
             ) : (
               <>
                 Save your date of birth and standard in your{" "}
-                <Link href="/profile" className="text-accent underline">
+                <Link href="/profile" className="text-accent-ink underline">
                   profile
                 </Link>{" "}
                 to fill these in automatically.
@@ -280,10 +279,10 @@ export default function AftCalculator() {
                   </div>
                 ) : status.kind === "duplicate" ? (
                   <p className="flex gap-2 text-sm text-ink">
-                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent-ink" aria-hidden />
                     <span>
                       This exact test is already saved.{" "}
-                      <Link href={`/score-history#result-${status.id}`} className="text-accent underline">
+                      <Link href={`/score-history#result-${status.id}`} className="text-accent-ink underline">
                         View it in history
                       </Link>
                     </span>
@@ -357,10 +356,12 @@ function EventCard({
         {points !== undefined && (
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
-              points < 60 ? "bg-bad/10 text-bad" : "bg-accent/10 text-accent"
+              points < 60 ? "bg-bad/10 text-bad" : "bg-accent/10 text-accent-ink"
             }`}
           >
+            {points < 60 && <AlertTriangle className="mr-1 inline h-3 w-3 align-[-2px]" aria-hidden />}
             {points} pts
+            {points < 60 && <span className="sr-only"> (below the 60-point minimum)</span>}
           </span>
         )}
       </div>

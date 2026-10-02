@@ -32,7 +32,7 @@ export default function DashboardPlanCard({ latestResultId }: { latestResultId: 
       title="Training plan"
       description={`Baseline from ${formatTestDate(plan.baseline.testDate)} · ${week <= 4 ? `week ${week} of 4` : "plan finished"}`}
       action={
-        <Link href="/training-plan" className="text-sm font-medium text-accent hover:underline">
+        <Link href="/training-plan" className="text-sm font-medium text-accent-ink hover:underline">
           Open plan
         </Link>
       }

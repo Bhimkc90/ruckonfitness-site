@@ -53,7 +53,7 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
       </nav>
 
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">{exercise.name}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">{exercise.name}</h1>
         <p className="mt-1 max-w-2xl text-sm text-ink-2">{exercise.summary}</p>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {memberships.map(({ drill, order }) => (

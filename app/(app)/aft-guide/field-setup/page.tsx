@@ -51,7 +51,7 @@ export default function FieldSetupPage() {
       </nav>
 
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">AFT field setup</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">AFT field setup</h1>
         <p className="mt-1 max-w-2xl text-sm text-ink-2">
           Equipment, layout, sequence, and roles for administering the Army Fitness Test, from ATP 7-22.01 (12 March 2026).
           The ATP makes all aspects of AFT administration the unit commander&apos;s responsibility.
@@ -132,7 +132,7 @@ export default function FieldSetupPage() {
       <GuideSection id="sdc" title="SDC lane layout and movement sequence">
         <p className="text-ink-2">
           Full event rules are on the{" "}
-          <Link href={aftGuideHref("sprint-drag-carry")} className="text-accent hover:underline">
+          <Link href={aftGuideHref("sprint-drag-carry")} className="text-accent-ink hover:underline">
             Sprint-Drag-Carry guide
           </Link>
           .
@@ -188,11 +188,11 @@ export default function FieldSetupPage() {
         <CitedList items={warmupRecovery} />
         <p className="mt-3 text-ink-2">
           Drill instructions:{" "}
-          <Link href={drillHref("preparation-drill")} className="text-accent hover:underline">
+          <Link href={drillHref("preparation-drill")} className="text-accent-ink hover:underline">
             Preparation Drill
           </Link>{" "}
           ·{" "}
-          <Link href={drillHref("recovery-drill")} className="text-accent hover:underline">
+          <Link href={drillHref("recovery-drill")} className="text-accent-ink hover:underline">
             Recovery Drill
           </Link>
         </p>

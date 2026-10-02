@@ -25,7 +25,8 @@ import {
 import { useAftResults, useHydrated } from "@/lib/storage/aftResults";
 import { useSettings } from "@/lib/storage/settings";
 import { Card, PageHeader } from "@/components/ui/Card";
-import { ButtonLink } from "@/components/ui/Button";
+import { ButtonLink, segmentClass, segmentGroupClass } from "@/components/ui/Button";
+import { fieldFocus } from "@/components/ui/form";
 import { PassFailBadge } from "@/components/ui/StatusBadge";
 import TrendChart, { type TrendPoint } from "./TrendChart";
 import DashboardPlanCard from "@/components/training/DashboardPlanCard";
@@ -266,7 +267,7 @@ export default function Dashboard() {
               id="event-select"
               value={event}
               onChange={(e) => setEvent(e.target.value as AftEventCode)}
-              className="rounded-lg border border-line-strong bg-surface-2 px-3 py-2 text-sm text-ink"
+              className={`rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink ${fieldFocus}`}
             >
               {aftEventOrder.map((code) => (
                 <option key={code} value={code}>
@@ -274,16 +275,14 @@ export default function Dashboard() {
                 </option>
               ))}
             </select>
-            <div role="group" aria-label="Measure" className="flex rounded-lg border border-line-strong p-0.5">
+            <div role="group" aria-label="Measure" className={segmentGroupClass}>
               {(["points", "raw"] as const).map((value) => (
                 <button
                   key={value}
                   type="button"
                   aria-pressed={mode === value}
                   onClick={() => setMode(value)}
-                  className={`rounded-md px-3 py-1.5 text-sm ${
-                    mode === value ? "bg-surface-2 font-semibold text-ink" : "text-ink-2 hover:text-ink"
-                  }`}
+                  className={segmentClass(mode === value)}
                 >
                   {value === "points" ? "Points" : "Raw"}
                 </button>
@@ -309,7 +308,7 @@ export default function Dashboard() {
       <Card
         title="Recent tests"
         action={
-          <Link href="/score-history" className="text-sm font-medium text-accent hover:underline">
+          <Link href="/score-history" className="text-sm font-medium text-accent-ink hover:underline">
             View all history
           </Link>
         }
@@ -343,7 +342,7 @@ export default function Dashboard() {
                   <td className="py-2.5 text-right">
                     <Link
                       href={`/score-history#result-${item.record.id}`}
-                      className="font-medium text-accent hover:underline"
+                      className="font-medium text-accent-ink hover:underline"
                     >
                       View<span className="sr-only"> result from {testLabel(item)}</span>
                     </Link>
@@ -410,7 +409,7 @@ function DashboardEmpty() {
       <PageHeader title="Dashboard" />
       <DashboardProfileCard />
       <Card className="mx-auto max-w-2xl text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent-ink">
           <ClipboardPlus className="h-6 w-6" aria-hidden />
         </div>
         <h2 className="mt-4 text-lg font-semibold text-ink">Record your first AFT</h2>
@@ -435,10 +434,10 @@ function DashboardLoading() {
       <div className="h-8 w-40 rounded bg-surface" />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-36 rounded-xl border border-line bg-surface" />
+          <div key={i} className="h-36 rounded-xl border border-card-line bg-surface shadow-sm" />
         ))}
       </div>
-      <div className="h-80 rounded-xl border border-line bg-surface" />
+      <div className="h-80 rounded-xl border border-card-line bg-surface shadow-sm" />
     </div>
   );
 }

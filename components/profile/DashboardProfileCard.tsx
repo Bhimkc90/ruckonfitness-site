@@ -22,7 +22,7 @@ export default function DashboardProfileCard({ latestTotal }: { latestTotal?: nu
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent-ink">
               <UserRound className="h-4 w-4" aria-hidden />
             </span>
             <div>
@@ -54,7 +54,7 @@ export default function DashboardProfileCard({ latestTotal }: { latestTotal?: nu
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent-ink">
             <UserRound className="h-4 w-4" aria-hidden />
           </span>
           <div className="min-w-0">
@@ -64,7 +64,7 @@ export default function DashboardProfileCard({ latestTotal }: { latestTotal?: nu
               <p className="mt-1 text-xs text-ink-2">Your saved next AFT date has passed. Update it in your profile.</p>
             )}
             {scoringMissing.length > 0 && (
-              <p className="mt-1 text-xs text-accent">Add {scoringMissing.join(", ")} to prefill Record AFT.</p>
+              <p className="mt-1 text-xs text-accent-ink">Add {scoringMissing.join(", ")} to prefill Record AFT.</p>
             )}
             {trainingMissing > 0 && (
               <p className="mt-1 text-xs text-ink-2">
@@ -73,7 +73,7 @@ export default function DashboardProfileCard({ latestTotal }: { latestTotal?: nu
             )}
           </div>
         </div>
-        <Link href="/profile" className="text-sm text-accent hover:underline">
+        <Link href="/profile" className="text-sm text-accent-ink hover:underline">
           {missing.length ? "Complete profile" : "Edit profile"}
         </Link>
       </div>

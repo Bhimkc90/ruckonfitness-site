@@ -6,7 +6,7 @@ import { WEEKDAYS, weekdayLabels } from "@/lib/training/engine";
 import type { PlanSession } from "@/lib/training/types";
 import type { SamplePlan } from "@/lib/training/samples";
 import { Card, PageHeader } from "@/components/ui/Card";
-import { ButtonLink } from "@/components/ui/Button";
+import { ButtonLink, segmentClass, segmentGroupClass } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/StatusBadge";
 import { FocusCard, NotesCard, SessionBody } from "./PlanPreview";
 
@@ -15,7 +15,7 @@ const weekOne = (sample: SamplePlan) => sample.plan.sessions.filter((s) => s.wee
 
 function PreviewLabel() {
   return (
-    <span className="inline-flex items-center gap-1 rounded bg-accent/15 px-1.5 py-0.5 text-[11px] font-semibold text-accent">
+    <span className="inline-flex items-center gap-1 rounded bg-accent/15 px-1.5 py-0.5 text-[11px] font-semibold text-accent-ink">
       <FlaskConical className="h-3 w-3" aria-hidden />
       Preview example · review pending
     </span>
@@ -57,14 +57,14 @@ export default function SamplePlans({ samples }: { samples: SamplePlan[] }) {
         </div>
       </Card>
 
-      <div role="group" aria-label="Sample profile" className="flex flex-wrap gap-1 rounded-lg border border-line-strong p-0.5 sm:inline-flex">
+      <div role="group" aria-label="Sample profile" className={`${segmentGroupClass} sm:inline-flex`}>
         {samples.map((s) => (
           <button
             key={s.id}
             type="button"
             aria-pressed={s.id === sample.id}
             onClick={() => setSelectedId(s.id)}
-            className={`rounded-md px-3 py-1.5 text-sm ${s.id === sample.id ? "bg-surface-2 font-semibold text-ink" : "text-ink-2 hover:text-ink"}`}
+            className={segmentClass(s.id === sample.id)}
           >
             {s.label}
           </button>

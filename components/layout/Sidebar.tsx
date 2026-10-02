@@ -81,7 +81,7 @@ export default function Sidebar() {
   return (
     <>
       {/* Mobile: brand bar with a horizontally scrolling nav row. */}
-      <header className="sticky top-0 z-20 border-b border-line bg-canvas/95 backdrop-blur lg:hidden">
+      <header className="theme-dark sticky top-0 z-20 border-b border-line bg-canvas/95 text-ink backdrop-blur lg:hidden">
         <div className="px-4 pt-3">
           <Brand />
         </div>
@@ -93,7 +93,7 @@ export default function Sidebar() {
       </header>
 
       {/* Desktop: compact fixed sidebar. */}
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-canvas px-3 py-5 lg:flex">
+      <aside className="theme-dark sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-canvas px-3 py-5 text-ink lg:flex">
         <div className="px-2">
           <Brand />
         </div>

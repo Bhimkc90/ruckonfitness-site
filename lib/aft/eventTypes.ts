@@ -118,7 +118,6 @@ export type AftEvent = {
   // null when the source gives no breathing guidance for the event.
   breathing?: string | null;
   refs?: Partial<Record<AftEventSection, string>>;
-  officialFigures?: { figure: string; title: string; page: string }[];
   video?: AftEventVideo;
   // Inconsistencies in the source, stated rather than resolved.
   discrepancies?: string[];

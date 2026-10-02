@@ -3,7 +3,7 @@ import type { AftResult } from "@/lib/aft/types";
 import { aftEventInfo } from "@/lib/aft/scoring";
 import { aftStandardRules } from "@/lib/aft/rules";
 import { columnLabel, formatRaw } from "@/lib/aft/format";
-import { PassFailBadge } from "@/components/ui/StatusBadge";
+import { PassFailBadge, EventPoints } from "@/components/ui/StatusBadge";
 
 export default function AftResultSummary({ result }: { result: AftResult }) {
   const rule = aftStandardRules[result.standard];
@@ -61,14 +61,12 @@ export default function AftResultSummary({ result }: { result: AftResult }) {
         </thead>
         <tbody className="tabular-nums">
           {result.events.map((item) => {
-            const below = item.points < rule.minEventPoints;
             return (
               <tr key={item.event} className="border-t border-line">
                 <td className="py-2 text-ink">{aftEventInfo[item.event].name}</td>
                 <td className="py-2 text-right text-ink-2">{formatRaw(item.event, item.raw)}</td>
-                <td className={`py-2 text-right font-semibold ${below ? "text-bad" : "text-ink"}`}>
-                  {item.points}
-                  {below && <span className="sr-only"> (below {rule.minEventPoints})</span>}
+                <td className="py-2 text-right font-semibold">
+                  <EventPoints points={item.points} minimum={rule.minEventPoints} />
                 </td>
               </tr>
             );

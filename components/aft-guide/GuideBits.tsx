@@ -1,4 +1,4 @@
-import { BookOpen, CheckSquare, ExternalLink, Info, Square } from "lucide-react";
+import { BookOpen, CheckSquare, ChevronDown, ExternalLink, Info, Square } from "lucide-react";
 import { guideSources, type GuideSourceId } from "@/lib/aft/guideSources";
 
 export function Ref({ children }: { children?: React.ReactNode }) {
@@ -15,21 +15,37 @@ export function GuideSection({
   id,
   title,
   refText,
+  level = 2,
   children,
 }: {
   id?: string;
   title: string;
   refText?: string;
+  level?: 2 | 3;
   children: React.ReactNode;
 }) {
+  const H = level === 2 ? "h2" : "h3";
   return (
-    <section id={id} aria-labelledby={id ? `${id}-heading` : undefined} className="scroll-mt-28 rounded-xl border border-line bg-surface p-4 sm:p-5 lg:scroll-mt-6">
-      <h2 id={id ? `${id}-heading` : undefined} className="text-base font-semibold text-ink">
+    <section id={id} aria-labelledby={id ? `${id}-heading` : undefined} className="scroll-mt-28 rounded-xl border border-card-line bg-surface p-4 shadow-sm sm:p-5 lg:scroll-mt-6">
+      <H id={id ? `${id}-heading` : undefined} className="text-lg font-bold text-ink">
         {title}
-      </h2>
-      <div className="mt-3 text-sm text-ink">{children}</div>
+      </H>
+      <div className="mt-3 text-sm leading-relaxed text-ink">{children}</div>
       <Ref>{refText}</Ref>
     </section>
+  );
+}
+
+// Supplementary detail that starts collapsed (grader procedures, anatomy, source notes).
+export function MoreDetails({ summary, children }: { summary: string; children: React.ReactNode }) {
+  return (
+    <details className="group mt-4 rounded-lg border border-card-line bg-surface-2/50">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-3 py-2.5 font-semibold text-ink hover:bg-surface-2 [&::-webkit-details-marker]:hidden">
+        {summary}
+        <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <div className="border-t border-card-line px-3 pb-3 pt-3">{children}</div>
+    </details>
   );
 }
 
@@ -63,7 +79,7 @@ export function Checklist({ items }: { items: { text: string; ref: string; origi
         const Icon = item.origin === "atp" ? CheckSquare : Square;
         return (
           <li key={item.text} className="flex gap-2.5">
-            <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${item.origin === "atp" ? "text-accent" : "text-ink-2"}`} aria-hidden />
+            <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${item.origin === "atp" ? "text-accent-ink" : "text-ink-2"}`} aria-hidden />
             <div>
               <p>
                 {item.text}
@@ -89,7 +105,7 @@ export function Note({ children }: { children: React.ReactNode }) {
 
 export function ExternalLinkText({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
+    <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-accent-ink hover:underline">
       {children}
       <ExternalLink className="h-3.5 w-3.5" aria-hidden />
       <span className="sr-only">(opens in a new tab)</span>

@@ -72,13 +72,13 @@ export default function SettingsPage() {
           <Row label="App version">{pkg.version}</Row>
           <Row label="Build">{commit ? `${commit} · ${formatTestDate(builtAt.slice(0, 10))}` : `Local build · ${formatTestDate(builtAt.slice(0, 10))}`}</Row>
           <Row label="Score tables">
-            <a href={aftScoringFile.path} className="text-accent underline">
+            <a href={aftScoringFile.path} className="text-accent-ink underline">
               {aftScoringFile.title}
             </a>{" "}
             (effective {formatTestDate(aftScoringFile.effectiveDate)})
           </Row>
           <Row label="Pass rules">
-            <a href={aftRulesSource.url} className="text-accent underline">
+            <a href={aftRulesSource.url} className="text-accent-ink underline">
               {aftRulesSource.publisher}, {formatTestDate(aftRulesSource.date)}
             </a>
           </Row>
