@@ -61,7 +61,7 @@
 }
 
 /* Keeps running text at a comfortable line length inside wide sections; charts, tables, and figures still use
-   the full width. Applied by shared containers (Card, GuideSection, library instructions). */
+   the full width. Applied by shared containers (Card, GuideSection, library instructions) and the Home page. */
 @utility readable {
   & p,
   & li,
