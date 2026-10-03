@@ -77,8 +77,8 @@ export default async function DrillPage({ params }: { params: Promise<{ id: stri
                         <span className="font-medium text-ink">{exercise.name}</span>
                         <span className="mt-0.5 block text-xs text-ink-2">
                           {cadenceLabels[execution.cadence]}
-                          {execution.officialPrescription ? ` · ${execution.officialPrescription}` : ""} · Start:{" "}
-                          {positions[execution.position].name}
+                          {execution.officialPrescription ? ` · ${execution.officialPrescription}` : ""}
+                          {execution.position && ` · Start: ${positions[execution.position].name}`}
                         </span>
                       </span>
                     </Link>

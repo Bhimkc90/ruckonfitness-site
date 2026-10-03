@@ -1,6 +1,7 @@
-import { AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ArrowRight } from "lucide-react";
 import type { DrillExecution, Exercise } from "@/lib/library/types";
-import { cadenceLabels, positions } from "@/lib/library";
+import { cadenceLabels, exerciseHref, positions } from "@/lib/library";
 import { Citation, SourceNote, Tag } from "./LibraryBits";
 
 // Instruction blocks shared by the standalone exercise page and the library's inline instructions, so each
@@ -19,7 +20,7 @@ export function stepsHeading(execution: DrillExecution): string {
 
 // Cadence and prescription, starting position, numbered steps, gaps in the source, and the citation.
 export function ExecutionDetails({ execution, level = 3 }: { execution: DrillExecution; level?: HeadingLevel }) {
-  const position = positions[execution.position];
+  const position = execution.position ? positions[execution.position] : undefined;
   return (
     <div className="min-w-0">
       <div className="flex flex-wrap gap-1.5">
@@ -31,7 +32,7 @@ export function ExecutionDetails({ execution, level = 3 }: { execution: DrillExe
         Starting position
       </Heading>
       <p className="mt-1 text-sm text-ink">{execution.startingPosition}</p>
-      {position.description && (
+      {position?.description && (
         <p className="mt-1 text-xs text-ink-2">
           {position.name}: {position.description}
           {position.source && (
@@ -119,6 +120,36 @@ export function FormGuidance({ exercise, level = 3 }: { exercise: Exercise; leve
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+// Alternatives the source itself describes, each with how it differs and its citation.
+export function Substitutions({ exercise, level = 3, heading = true }: { exercise: Exercise; level?: HeadingLevel; heading?: boolean }) {
+  if (!exercise.substitutions?.length) return null;
+  return (
+    <div>
+      {heading && (
+        <Heading level={level} className="mb-2 text-sm font-semibold text-ink">
+          Substitutions
+        </Heading>
+      )}
+      <ul className="space-y-2.5 text-sm">
+        {exercise.substitutions.map((sub) => (
+          <li key={sub.name}>
+            {sub.exerciseId ? (
+              <Link href={exerciseHref(sub.exerciseId)} className="inline-flex items-center gap-1 font-medium text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink">
+                {sub.name}
+                <ArrowRight className="h-3 w-3" aria-hidden />
+              </Link>
+            ) : (
+              <span className="font-medium text-ink">{sub.name}</span>
+            )}
+            <span className="text-ink-2"> — {sub.difference}</span>{" "}
+            <Citation source={sub.source} />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

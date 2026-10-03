@@ -4,6 +4,7 @@ import { preparationExercises } from "./exercises-preparation";
 import { conditioningExercises } from "./exercises-conditioning";
 import { recoveryExercises } from "./exercises-recovery";
 import { fourForTheCoreExercises, loadedExercises, militaryMovementExercises } from "./exercises-additional";
+import { moreAtpExercises } from "./exercises-atp-more";
 import { drills } from "./drills";
 
 export { drills };
@@ -16,6 +17,7 @@ export const exercises: Exercise[] = [
   ...conditioningExercises,
   ...recoveryExercises,
   ...loadedExercises,
+  ...moreAtpExercises,
 ];
 
 const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]));
@@ -91,6 +93,7 @@ export const movementLabels: Record<MovementPattern, string> = {
   run: "Running",
   "trunk-stability": "Trunk stability (hold)",
   stretch: "Stretch",
+  "ankle-extension": "Ankle extension (heel raise)",
 };
 
 export const cadenceLabels = {

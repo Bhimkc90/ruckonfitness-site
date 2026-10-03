@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, RotateCcw, Search, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Footprints, Info, RotateCcw, Search, X } from "lucide-react";
 import type { AftEventCode } from "@/lib/aft/types";
 import type { DrillId, Equipment, Exercise, Phase, Purpose } from "@/lib/library/types";
 import {
@@ -13,23 +13,51 @@ import {
   emptyFilters,
   equipmentLabels,
   exerciseHref,
-  exercises,
   hasActiveFilters,
   phaseLabels,
   purposeLabels,
   type LibraryFilters,
 } from "@/lib/library";
-import { CATEGORY_NOTE, filterSections, librarySections, matchingExerciseCount, type LibrarySection } from "@/lib/library/sections";
-import { buttonClass } from "@/components/ui/Button";
+import { GENERAL_NOTE, filterSections, librarySections, matchingExerciseCount, viewExerciseCount, type LibrarySection, type LibraryView } from "@/lib/library/sections";
+import { activities } from "@/lib/training/templates";
+import { buttonClass, segmentClass } from "@/components/ui/Button";
 import { fieldFocus } from "@/components/ui/form";
 import { Tag } from "./LibraryBits";
-import { DemonstrationNote, ExecutionDetails, FormGuidance, hasFormGuidance } from "./ExerciseDetail";
+import { DemonstrationNote, ExecutionDetails, FormGuidance, Substitutions, hasFormGuidance } from "./ExerciseDetail";
 import { FIGURE_READING_NOTE, FigureList } from "./FigureGallery";
 import { accents } from "./accents";
 import { ExerciseThumbSmall } from "./ExerciseImage";
 import { figuresInDrill } from "@/lib/library/images";
 
 const SECTIONS = librarySections();
+
+// The chosen view lives in the URL (?view=general) so it can be shared; the Military view is the default.
+const VIEW_EVENT = "library-view";
+function subscribeView(onChange: () => void) {
+  window.addEventListener("popstate", onChange);
+  window.addEventListener(VIEW_EVENT, onChange);
+  return () => {
+    window.removeEventListener("popstate", onChange);
+    window.removeEventListener(VIEW_EVENT, onChange);
+  };
+}
+const urlView = (): LibraryView => (new URLSearchParams(window.location.search).get("view") === "general" ? "general" : "military");
+function chooseView(view: LibraryView) {
+  const url = new URL(window.location.href);
+  if (view === "general") url.searchParams.set("view", "general");
+  else url.searchParams.delete("view");
+  url.hash = "";
+  window.history.replaceState(window.history.state, "", url);
+  window.dispatchEvent(new Event(VIEW_EVENT));
+}
+
+const VIEWS: { id: LibraryView; title: string; text: string }[] = [
+  { id: "military", title: "Military / PRT", text: "Official Army drills in order, plus more ATP 7-22.02 exercises" },
+  { id: "general", title: "General Fitness", text: "Strength, endurance, core, and conditioning groups for AFT preparation" },
+];
+
+// Running activities come from Training Plans' activity records; prescriptions stay there.
+const AEROBIC_ACTIVITIES = (["walk", "easy-run", "intervals-30-60"] as const).map((id) => ({ id, ...activities[id] }));
 
 const selectClass =
   `mt-1 w-full rounded-lg border border-line-strong bg-surface px-2.5 py-1.5 text-sm text-ink ${fieldFocus}`;
@@ -51,29 +79,98 @@ function filterValueLabel(key: Exclude<keyof LibraryFilters, "query">, value: st
 }
 
 export default function LibraryBrowser() {
+  const view = useSyncExternalStore(subscribeView, urlView, () => "military" as const);
   const [filters, setFilters] = useState<LibraryFilters>(emptyFilters);
   const set = <K extends keyof LibraryFilters>(key: K, value: LibraryFilters[K]) => setFilters((current) => ({ ...current, [key]: value }));
   const reset = () => setFilters(emptyFilters);
   const accordion = useAccordion();
+  const switchView = (next: LibraryView) => {
+    // The drill filter belongs to the Military view only.
+    if (next === "general") set("drill", "all");
+    chooseView(next);
+  };
 
-  const visible = filterSections(filters, SECTIONS);
+  const visible = filterSections(filters, view, SECTIONS);
   const count = matchingExerciseCount(visible);
+  const total = viewExerciseCount(view, SECTIONS);
+  const sectionTotal = SECTIONS.filter((s) => s.view === view).length;
   const active = hasActiveFilters(filters);
   const activeKeys = (Object.keys(filterLabels) as (keyof typeof filterLabels)[]).filter((k) => filters[k] !== "all");
   const drillSections = visible.filter((v) => v.section.kind === "drill");
-  const categorySections = visible.filter((v) => v.section.kind === "category");
+  const otherSections = visible.filter((v) => v.section.kind !== "drill");
+  const showAerobic =
+    view === "general" &&
+    (filters.aftEvent === "all" || filters.aftEvent === "2MR") &&
+    (filters.equipment === "all" || filters.equipment === "none") &&
+    (filters.purpose === "all" || filters.purpose === "aerobic-endurance") &&
+    (filters.phase === "all" || filters.phase === "main") &&
+    AEROBIC_ACTIVITIES.some((a) => matchesActivity(a, filters.query));
 
   return (
     <div className="space-y-6">
+      {/* View switcher */}
+      <div role="group" aria-label="Library view" className="grid gap-2 sm:grid-cols-2">
+        {VIEWS.map((v) => {
+          const on = view === v.id;
+          return (
+            <button
+              key={v.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => switchView(v.id)}
+              className={`rounded-xl border-2 p-3 text-left transition-colors sm:p-4 ${on ? "border-ink bg-accent text-black" : "border-card-line bg-surface text-ink hover:border-ink"}`}
+            >
+              <span className="block text-base font-bold">{v.title}</span>
+              <span className={`mt-0.5 block text-sm ${on ? "text-black/80" : "text-ink-2"}`}>{v.text}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {view === "general" && (
+        <p className="readable flex gap-2 rounded-lg border border-card-line bg-surface px-3 py-2.5 text-sm text-ink-2">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-ink" aria-hidden />
+          <span>
+            {GENERAL_NOTE} Every exercise comes from ATP 7-22.02 and cites it. AFT links show a plausible supporting movement, not evidence that the
+            exercise raises AFT scores. Sets, repetitions, and schedules belong in{" "}
+            <Link href="/training-plan" className="font-medium text-ink underline underline-offset-2">
+              Training Plans
+            </Link>
+            .
+          </span>
+        </p>
+      )}
+
       {/* Jump links */}
       <nav aria-label="Library sections" className="space-y-2">
         {drillSections.length > 0 && <JumpLinks label="Drills" items={drillSections} />}
-        {categorySections.length > 0 && <JumpLinks label="More exercises" items={categorySections} />}
+        {otherSections.length > 0 && <JumpLinks label={view === "general" ? "Groups" : "More"} items={otherSections} />}
+        {showAerobic && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <a href="#aerobic-activities" className="inline-flex items-center gap-1.5 rounded-full border border-card-line bg-card px-3 py-1 text-sm font-medium text-ink hover:border-ink">
+              Aerobic activities
+            </a>
+          </div>
+        )}
       </nav>
 
       {/* Search and filters */}
       <section aria-label="Search and filters" className="rounded-xl border border-card-line bg-card p-3 shadow-sm sm:p-4">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-[minmax(0,2fr)_repeat(5,minmax(0,1fr))] md:items-end">
+        <div role="group" aria-label="Supports AFT event" className="mb-3 flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs font-semibold text-ink">Supports AFT event</span>
+          {(["all", ...(Object.keys(aftEventLabels) as AftEventCode[])] as const).map((code) => (
+            <button
+              key={code}
+              type="button"
+              aria-pressed={filters.aftEvent === code}
+              onClick={() => set("aftEvent", code)}
+              className={`${segmentClass(filters.aftEvent === code)} border ${filters.aftEvent === code ? "border-accent" : "border-line-strong"} py-1 text-xs`}
+            >
+              {code === "all" ? "All events" : aftEventLabels[code]}
+            </button>
+          ))}
+        </div>
+        <div className={`grid grid-cols-2 gap-3 md:items-end ${view === "military" ? "md:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]" : "md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]"}`}>
           <label className="col-span-2 block text-xs md:col-span-1">
             <span className="text-ink-2">Search</span>
             <span className="relative mt-1 block">
@@ -87,7 +184,9 @@ export default function LibraryBrowser() {
               />
             </span>
           </label>
-          <FilterSelect label="Drill" value={filters.drill} onChange={(v) => set("drill", v as DrillId | "all")} all="All drills" options={drills.map((d) => [d.id, d.name])} />
+          {view === "military" && (
+            <FilterSelect label="Drill" value={filters.drill} onChange={(v) => set("drill", v as DrillId | "all")} all="All drills" options={drills.map((d) => [d.id, d.name])} />
+          )}
           <FilterSelect
             label="Purpose (app)"
             value={filters.purpose}
@@ -103,25 +202,18 @@ export default function LibraryBrowser() {
             all="Any equipment"
             options={(Object.keys(equipmentLabels) as Equipment[]).map((e) => [e, equipmentLabels[e]])}
           />
-          <FilterSelect
-            label="AFT event (app)"
-            value={filters.aftEvent}
-            onChange={(v) => set("aftEvent", v as AftEventCode | "all")}
-            all="Any event"
-            options={(Object.keys(aftEventLabels) as AftEventCode[]).map((e) => [e, aftEventLabels[e]])}
-          />
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
           <p aria-live="polite" className="text-ink-2">
             {active ? (
               <>
-                <span className="font-semibold text-ink">{count}</span> of {exercises.length} exercises match in {visible.length}{" "}
+                <span className="font-semibold text-ink">{count}</span> of {total} exercises match in {visible.length}{" "}
                 {visible.length === 1 ? "section" : "sections"}
               </>
             ) : (
               <>
-                {exercises.length} exercises in {SECTIONS.length} sections
+                {total} exercises in {sectionTotal} sections
               </>
             )}
           </p>
@@ -143,7 +235,7 @@ export default function LibraryBrowser() {
         </div>
       </section>
 
-      {visible.length === 0 ? (
+      {visible.length === 0 && !showAerobic ? (
         <div className="rounded-xl border border-dashed border-line-strong p-8 text-center">
           <p className="font-medium text-ink">No exercises match these filters.</p>
           <p className="mt-1 text-sm text-ink-2">Try a shorter search, or remove a filter. Some combinations don&apos;t exist, such as loaded equipment within a bodyweight drill.</p>
@@ -157,6 +249,7 @@ export default function LibraryBrowser() {
           {visible.map(({ section, exercises: shown }) => (
             <SectionBlock key={section.id} section={section} shown={shown} filtered={active} accordion={accordion} />
           ))}
+          {showAerobic && <AerobicActivities query={filters.query} />}
         </div>
       )}
     </div>
@@ -328,7 +421,11 @@ function SectionBlock({
           <span className={`mt-1 w-1 shrink-0 self-stretch rounded-full ${accent.bar}`} aria-hidden />
           <div className="min-w-0">
             <p className={`text-xs font-semibold uppercase tracking-wider ${accent.text}`}>
-              {section.kind === "drill" ? `${accent.label} · ${section.drill.officialCategory} (Army)` : CATEGORY_NOTE}
+              {section.kind === "drill"
+                ? `${accent.label} · ${section.drill.officialCategory} (Army)`
+                : section.kind === "atp"
+                  ? "Army · ATP 7-22.02"
+                  : "General Fitness · RuckOn grouping"}
             </p>
             <h2 id={sectionHeadingId} className="mt-1 text-2xl font-bold tracking-tight text-ink">
               {section.title}
@@ -402,7 +499,8 @@ function ExerciseRow({
 }) {
   const order = officialOrder(section, exercise);
   const otherDrills = drillMemberships(exercise.id).filter(({ drill }) => drill.id !== section.id);
-  const context = section.kind === "category" ? exercise.executions.find((e) => e.context)?.context : undefined;
+  // Outside a drill section, name where the exercise comes from (drill memberships show as tags).
+  const context = section.kind !== "drill" ? exercise.executions.filter((e) => e.context).map((e) => e.context).join("; ") || undefined : undefined;
   const abbreviation = section.kind === "drill" ? section.drill.abbreviation : undefined;
   const nameId = `${rowId}-name`;
   const summaryId = `${rowId}-summary`;
@@ -529,7 +627,11 @@ function InlineInstructions({
         <div className={`min-w-0 space-y-6 ${figures.length > 0 ? "lg:order-1" : "lg:col-span-2 lg:max-w-3xl"}`}>
           {executions.map((execution) => (
             <div key={execution.drillId ?? execution.context}>
-              {multiple && <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-ink">In {execution.context}</h4>}
+              {multiple && (
+                <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-ink">
+                  {execution.drillId ? `In the ${drills.find((d) => d.id === execution.drillId)?.name ?? "drill"}` : `In ${execution.context}`}
+                </h4>
+              )}
               <ExecutionDetails execution={execution} level={multiple ? 5 : 4} />
             </div>
           ))}
@@ -541,6 +643,8 @@ function InlineInstructions({
               <FormGuidance exercise={exercise} level={5} />
             </div>
           )}
+
+          <Substitutions exercise={exercise} level={4} />
 
           <div className="space-y-2">
             <DemonstrationNote exercise={exercise} hasPhotos={figures.length > 0} />
@@ -592,5 +696,63 @@ function InlineInstructions({
         </button>
       </nav>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Aerobic activities (General Fitness view)
+// ---------------------------------------------------------------------------
+
+function matchesActivity(activity: { name: string; description: string }, query: string): boolean {
+  const terms = query.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const text = `${activity.name} ${activity.description} run running aerobic`.toLowerCase();
+  return terms.every((t) => text.includes(t));
+}
+
+// Running is described here as activities, not exercises; durations and progression are set in Training Plans.
+function AerobicActivities({ query }: { query: string }) {
+  const shown = AEROBIC_ACTIVITIES.filter((a) => matchesActivity(a, query));
+  return (
+    <section id="aerobic-activities" aria-labelledby="aerobic-activities-heading" className="scroll-mt-32 lg:scroll-mt-6">
+      <header className="border-b-2 border-ink pb-4">
+        <p className="text-xs font-semibold uppercase tracking-wider text-ink-2">General Fitness · RuckOn grouping</p>
+        <h2 id="aerobic-activities-heading" className="mt-1 text-2xl font-bold tracking-tight text-ink">
+          Aerobic activities
+        </h2>
+        <p className="readable mt-1.5 text-sm leading-relaxed text-ink-2">
+          Running and walking are sessions, not single exercises, so they are listed as activities. How long and how often to do them is set in
+          Training Plans.
+        </p>
+      </header>
+      <ul className="mt-4 grid gap-3 md:grid-cols-3">
+        {shown.map((activity) => (
+          <li key={activity.id} className="flex flex-col rounded-xl border border-card-line bg-card p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Footprints className="h-5 w-5 text-ink-2" aria-hidden />
+              <h3 className="font-semibold text-ink">{activity.name}</h3>
+            </div>
+            <p className="mt-1.5 text-sm text-ink-2">{activity.description}</p>
+            <p className="mt-2 flex flex-wrap gap-1.5">
+              <Tag>Supports: {aftEventLabels["2MR"]}</Tag>
+            </p>
+            <details className="mt-3 text-xs text-ink-2">
+              <summary className="cursor-pointer font-medium text-ink">Sources</summary>
+              <ul className="mt-1.5 list-disc space-y-1 pl-4">
+                {activity.sources.map((source) => (
+                  <li key={source}>{source}</li>
+                ))}
+              </ul>
+            </details>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs text-ink-2">
+        The 2-mile run link is a RuckOn mapping. Interval and run sessions are prescribed in{" "}
+        <Link href="/training-plan" className="font-medium text-ink underline underline-offset-2">
+          Training Plans
+        </Link>
+        .
+      </p>
+    </section>
   );
 }

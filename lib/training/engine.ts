@@ -130,7 +130,7 @@ export function exerciseAllowed(exerciseId: string, restrictions: Set<Restrictio
   if (restrictions.has("no-loaded-lifting") && !exercise.tags.equipment.includes("none")) return false;
   if (restrictions.has("no-weight-on-hands")) {
     if (exercise.tags.movementPatterns.includes("push")) return false;
-    if (exercise.executions.some((x) => HANDS_POSITIONS.has(x.position))) return false;
+    if (exercise.executions.some((x) => x.position !== undefined && HANDS_POSITIONS.has(x.position))) return false;
   }
   return true;
 }

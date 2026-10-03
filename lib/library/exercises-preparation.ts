@@ -301,12 +301,35 @@ export const preparationExercises: Exercise[] = [
         sourceNotes: ["The ATP's printed steps end at count 3."],
         source: atp("3-10", "3-7", "Figure 3-10"),
       },
+      {
+        context: "Strength Training Circuit, station 3 (kettlebells)",
+        position: "straddle-stance",
+        startingPosition: "Straddle Stance holding a kettlebell at each side with a neutral grip.",
+        steps: [
+          { label: "Count 1", text: "Step forward with the left leg, bending the left knee until the left thigh is parallel to the ground. Lean slightly forward from the waist so the kettlebells come to either side of the forward leg." },
+          { label: "Count 2", text: "Reverse the movement to the starting position." },
+          { label: "Count 3", text: "Repeat count 1, stepping forward with the right leg." },
+          { label: "Count 4", text: "Return to the starting position." },
+        ],
+        cadence: "controlled",
+        officialPrescription: "One minute at station 3 of the Strength Training Circuit, resting or adjusting the weight if needed.",
+        source: atp("13-5", "13-3 – 13-4", "Figure 13-3"),
+      },
     ],
     cues: ["Step so the lead heel lands 3–6 inches ahead of the rear foot.", "Keep the back straight."],
     commonMistakes: ["Looking down.", "Bringing the feet closer together."],
     cautions: [],
+    substitutions: [
+      {
+        exerciseId: "step-up",
+        name: "8-Count Step-Up",
+        difference: "Steps up onto a 12- to 18-inch step instead of forward on level ground.",
+        source: atp("13-6", "13-4"),
+      },
+    ],
     tags: {
       ...bodyweight,
+      equipment: ["none", "kettlebell"],
       purposes: ["strength", "balance-stability"],
       impact: "no-jumping",
       movementPatterns: ["lunge"],
@@ -421,6 +444,25 @@ export const preparationExercises: Exercise[] = [
     cues: ["Keep a straight line from the top of the head to the heels.", "Lower until the upper arms are parallel to the ground."],
     commonMistakes: [],
     cautions: [],
+    substitutions: [
+      {
+        name: "Push-Up (modified, Six-Point Stance)",
+        difference: "Hands and knees on the ground with the body straight from head to knees. The ATP uses it to limit range of motion and the load on the ankles, shoulders, arms, and wrists.",
+        source: atp("3-24", "3-18"),
+      },
+      {
+        exerciseId: "eight-count-t-push-up",
+        name: "8-Count T-Push-Up",
+        difference: "Lowers to the ground and moves the arms out to a T before pushing up, like the hand release in the AFT push-up.",
+        source: atp("5-23", "5-12 – 5-13"),
+      },
+      {
+        exerciseId: "supine-chest-press",
+        name: "Supine Chest Press",
+        difference: "Presses kettlebells while lying on the back, so the trunk does not have to hold a plank position.",
+        source: atp("13-9", "13-7"),
+      },
+    ],
     tags: {
       ...bodyweight,
       purposes: ["strength"],

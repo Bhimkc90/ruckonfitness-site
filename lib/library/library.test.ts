@@ -16,7 +16,7 @@ import {
   sources,
 } from "./index";
 import type { LibraryFilters } from "./index";
-import { filterSections, librarySections, matchingExerciseCount } from "./sections";
+import { filterSections, librarySections, matchingExerciseCount, viewExerciseCount } from "./sections";
 
 // Official exercise order, typed independently from ATP 7-22.02 (INCL C1):
 // para 3-1 (p. 3-1), 4-15 – 4-18 (pp. 4-9 – 4-11), 8-3 – 8-5 (pp. 8-1 – 8-2), 5-1 (p. 5-1), 5-18 (p. 5-9),
@@ -59,7 +59,7 @@ describe("IDs and references", () => {
     for (const id of ids) expect(id).toMatch(kebab);
   });
 
-  it("includes exactly the six verified drills and 37 unique exercises", () => {
+  it("includes exactly the six verified drills and 49 unique exercises", () => {
     expect(drills.map((d) => d.id)).toEqual([
       "preparation-drill",
       "four-for-the-core",
@@ -68,7 +68,7 @@ describe("IDs and references", () => {
       "conditioning-drill-2",
       "recovery-drill",
     ]);
-    expect(exercises).toHaveLength(37);
+    expect(exercises).toHaveLength(49);
   });
 
   it("matches the official exercise order for every drill", () => {
@@ -99,9 +99,9 @@ describe("IDs and references", () => {
         if (execution.drillId) {
           expect(getDrill(execution.drillId)?.sequence, `${exercise.id} in ${execution.drillId}`).toContain(exercise.id);
         } else {
-          // Exercises outside a library drill name their official context and a session phase.
+          // Executions outside a library drill name their official context; exercises in no drill also need a phase.
           expect(execution.context, exercise.id).toBeTruthy();
-          expect(exercise.tags.phases?.length, exercise.id).toBeGreaterThan(0);
+          if (drillMemberships(exercise.id).length === 0) expect(exercise.tags.phases?.length, exercise.id).toBeGreaterThan(0);
         }
       }
     }
@@ -109,7 +109,11 @@ describe("IDs and references", () => {
 
   it("uses only defined starting positions", () => {
     for (const exercise of exercises) {
-      for (const execution of exercise.executions) expect(positions[execution.position]).toBeDefined();
+      for (const execution of exercise.executions) {
+        // Drill executions always name a position; others may describe an unnamed start (e.g. bench-supported).
+        if (execution.drillId) expect(execution.position).toBeDefined();
+        if (execution.position) expect(positions[execution.position]).toBeDefined();
+      }
     }
   });
 
@@ -188,7 +192,7 @@ describe("filters", () => {
   const f = (overrides: Partial<LibraryFilters>): LibraryFilters => ({ ...emptyFilters, ...overrides });
 
   it("returns everything with no filters", () => {
-    expect(filterExercises(emptyFilters)).toHaveLength(37);
+    expect(filterExercises(emptyFilters)).toHaveLength(49);
     expect(filterDrills(emptyFilters)).toHaveLength(6);
     expect(hasActiveFilters(emptyFilters)).toBe(false);
     expect(hasActiveFilters(f({ query: "lunge" }))).toBe(true);
@@ -200,8 +204,23 @@ describe("filters", () => {
     expect(exercisePhases(getExercise("rear-lunge")!).sort()).toEqual(["recovery", "warm-up"]);
     expect(filterExercises(f({ phase: "recovery" }))).toHaveLength(8);
     expect(filterExercises(f({ phase: "warm-up" }))).toHaveLength(17);
-    expect(filterExercises(f({ phase: "main" }))).toHaveLength(13);
-    expect(ids(filterExercises(f({ equipment: "kettlebell" })))).toEqual(["deadlift", "straight-leg-deadlift", "sumo-squat"]);
+    expect(filterExercises(f({ phase: "main" }))).toHaveLength(25);
+    expect(ids(filterExercises(f({ equipment: "kettlebell" })))).toEqual([
+      "back-squat",
+      "bench-press",
+      "bent-over-row",
+      "deadlift",
+      "forward-lunge",
+      "front-squat",
+      "heel-raise",
+      "overhead-push-press",
+      "single-arm-bent-over-row",
+      "step-up",
+      "straight-leg-deadlift",
+      "sumo-squat",
+      "supine-body-twist",
+      "supine-chest-press",
+    ]);
   });
 
   it("combines purpose, drill, and AFT event filters", () => {
@@ -210,22 +229,32 @@ describe("filters", () => {
       "turn-and-lunge",
     ]);
     expect(ids(filterExercises(f({ aftEvent: "HRP" })))).toEqual([
+      "bench-press",
+      "bent-over-row",
       "eight-count-t-push-up",
       "push-up",
+      "single-arm-bent-over-row",
       "single-leg-push-up",
+      "supine-chest-press",
     ]);
     expect(ids(filterExercises(f({ aftEvent: "MDL" })))).toEqual([
       "back-bridge",
+      "back-squat",
+      "bent-over-row",
       "deadlift",
+      "front-squat",
+      "single-arm-bent-over-row",
+      "single-leg-deadlift",
       "squat-bender",
       "straight-leg-deadlift",
       "sumo-squat",
     ]);
+    expect(ids(filterExercises(f({ aftEvent: "2MR" })))).toEqual(["heel-raise"]);
     expect(ids(filterExercises(f({ aftEvent: "HRP", drill: "conditioning-drill-1" })))).toEqual(["single-leg-push-up"]);
   });
 
   it("returns an empty list for combinations with no match", () => {
-    expect(filterExercises(f({ aftEvent: "2MR" }))).toEqual([]);
+    expect(filterExercises(f({ aftEvent: "2MR", equipment: "none" }))).toEqual([]);
     expect(filterExercises(f({ phase: "recovery", purpose: "speed" }))).toEqual([]);
     expect(filterDrills(f({ phase: "recovery", aftEvent: "HRP" }))).toEqual([]);
   });
@@ -238,6 +267,7 @@ describe("filters", () => {
       "eight-count-t-push-up",
       "push-up",
       "single-leg-push-up",
+      "supine-chest-press",
     ]);
     expect(filterExercises(f({ query: "CD2" }))).toHaveLength(5);
     expect(ids(filterDrills(f({ query: "swimmer" })))).toEqual(["conditioning-drill-2"]);
@@ -266,16 +296,27 @@ describe("internal links", () => {
 describe("library sections", () => {
   const sections = librarySections();
   const all = { query: "", drill: "all", purpose: "all", phase: "all", equipment: "all", aftEvent: "all" } as const;
+  const military = sections.filter((s) => s.view === "military");
+  const general = sections.filter((s) => s.view === "general");
 
-  it("orders drill sections Preparation, Conditioning 1 and 2, other drills, Recovery, then app categories", () => {
-    expect(sections.map((s) => s.id)).toEqual([
+  it("orders the Military view: Preparation, Conditioning 1 and 2, other drills, Recovery, then more ATP exercises", () => {
+    expect(military.map((s) => s.id)).toEqual([
       "preparation-drill",
       "conditioning-drill-1",
       "conditioning-drill-2",
       "four-for-the-core",
       "military-movement-drill-1",
       "recovery-drill",
-      "more-strength",
+      "more-atp",
+    ]);
+  });
+
+  it("groups the General Fitness view into four app categories", () => {
+    expect(general.map((s) => s.id)).toEqual([
+      "general-strength",
+      "general-muscular-endurance",
+      "general-core-stability",
+      "general-conditioning-agility",
     ]);
   });
 
@@ -287,33 +328,56 @@ describe("library sections", () => {
     }
   });
 
-  it("shows every exercise, puts only non-drill exercises in app categories, and references records by ID", () => {
-    const shown = new Set(sections.flatMap((s) => s.exerciseIds));
+  it("shows every exercise in the Military view, with only non-drill exercises in the ATP section", () => {
+    const shown = new Set(military.flatMap((s) => s.exerciseIds));
     expect(shown.size).toBe(exercises.length);
     const inDrills = new Set(drills.flatMap((d) => d.sequence));
-    const categoryIds = sections.filter((s) => s.kind === "category").flatMap((s) => s.exerciseIds);
-    expect(categoryIds.sort()).toEqual(exercises.filter((e) => !inDrills.has(e.id)).map((e) => e.id).sort());
-    expect(new Set(categoryIds).size).toBe(categoryIds.length);
-    // Rear Lunge appears in two sections but is the same record.
+    const atpIds = military.filter((s) => s.kind === "atp").flatMap((s) => s.exerciseIds);
+    expect([...atpIds].sort()).toEqual(exercises.filter((e) => !inDrills.has(e.id)).map((e) => e.id).sort());
+    expect(new Set(atpIds).size).toBe(atpIds.length);
+  });
+
+  it("references existing records in General Fitness, once per group, reusing drill exercises rather than copying them", () => {
+    for (const section of general) {
+      for (const id of section.exerciseIds) expect(getExercise(id), `${section.id} -> ${id}`).toBeDefined();
+      expect(new Set(section.exerciseIds).size).toBe(section.exerciseIds.length);
+    }
+    const pushUps = [...filterSections({ ...all, query: "push-up" }, "military"), ...filterSections({ ...all, query: "push-up" }, "general")]
+      .flatMap((v) => v.exercises.filter((e) => e.id === "push-up"));
+    expect(pushUps.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(pushUps).size).toBe(1);
+    // Rear Lunge appears in two drill sections but is the same record.
     const lunges = filterSections({ ...all, query: "rear lunge" }).flatMap((v) => v.exercises.filter((e) => e.id === "rear-lunge"));
     expect(lunges).toHaveLength(2);
     expect(lunges[0]).toBe(lunges[1]);
   });
 
-  it("returns every section with no filters", () => {
-    const visible = filterSections(all);
-    expect(visible.map((v) => v.section.id)).toEqual(sections.map((s) => s.id));
-    expect(matchingExerciseCount(visible)).toBe(exercises.length);
+  it("returns every section of a view with no filters", () => {
+    expect(filterSections(all, "military").map((v) => v.section.id)).toEqual(military.map((s) => s.id));
+    expect(matchingExerciseCount(filterSections(all, "military"))).toBe(exercises.length);
+    expect(filterSections(all, "general").map((v) => v.section.id)).toEqual(general.map((s) => s.id));
+    expect(matchingExerciseCount(filterSections(all, "general"))).toBe(viewExerciseCount("general"));
   });
 
-  it("hides empty sections and counts distinct matches across sections", () => {
-    const kettlebell = filterSections({ ...all, equipment: "kettlebell" });
-    expect(kettlebell.map((v) => v.section.id)).toEqual(["more-strength"]);
+  it("hides empty sections, keeps bodyweight drills out of loaded-equipment results, and counts distinct matches", () => {
+    expect(filterSections({ ...all, equipment: "kettlebell" }, "military").map((v) => v.section.id)).toEqual(["more-atp"]);
+    expect(filterSections({ ...all, equipment: "kettlebell" }, "general").map((v) => v.section.id)).toEqual([
+      "general-strength",
+      "general-muscular-endurance",
+      "general-core-stability",
+    ]);
     const jumping = filterSections({ ...all, query: "jump" });
     expect(jumping.every((v) => v.exercises.length > 0)).toBe(true);
     const lunge = filterSections({ ...all, query: "rear lunge" });
     expect(lunge.map((v) => v.section.id)).toEqual(["preparation-drill", "recovery-drill"]);
     expect(matchingExerciseCount(lunge)).toBe(1);
+  });
+
+  it("filters General Fitness by supported AFT event", () => {
+    expect(filterSections({ ...all, aftEvent: "2MR" }, "general").flatMap((v) => v.exercises.map((e) => e.id))).toEqual(["heel-raise"]);
+    const hrp = filterSections({ ...all, aftEvent: "HRP" }, "general");
+    expect(hrp.flatMap((v) => v.exercises).every((e) => e.aft?.events.includes("HRP"))).toBe(true);
+    expect(hrp.map((v) => v.section.id)).toEqual(["general-strength", "general-muscular-endurance"]);
   });
 
   it("combines search and filters, and a drill filter shows only that drill in order", () => {
@@ -328,5 +392,22 @@ describe("library sections", () => {
     // Phase follows the section's drill: Rear Lunge is a recovery exercise only under the Recovery Drill.
     expect(filterSections({ ...all, query: "rear lunge", phase: "recovery" }).map((v) => v.section.id)).toEqual(["recovery-drill"]);
     expect(filterSections({ ...all, phase: "warm-up" }).map((v) => v.section.id)).toEqual(["preparation-drill", "four-for-the-core", "military-movement-drill-1"]);
+    // The drill filter does not apply to the General Fitness view.
+    expect(filterSections({ ...all, drill: "conditioning-drill-1" }, "general").length).toBe(general.length);
+  });
+});
+
+describe("substitutions", () => {
+  it("cite the source and link only to exercises that exist, never to themselves", () => {
+    for (const exercise of exercises) {
+      for (const sub of exercise.substitutions ?? []) {
+        expect(sub.difference.length, `${exercise.id}: ${sub.name}`).toBeGreaterThan(20);
+        expect(sub.source.paragraphs, `${exercise.id}: ${sub.name}`).toBeTruthy();
+        if (sub.exerciseId) {
+          expect(getExercise(sub.exerciseId), `${exercise.id} -> ${sub.exerciseId}`).toBeDefined();
+          expect(sub.exerciseId).not.toBe(exercise.id);
+        }
+      }
+    }
   });
 });

@@ -61,6 +61,23 @@ export const exerciseFigures: ExerciseFigure[] = [
   { exerciseId: "groin-stretch", src: "/images/exercises/groin-stretch.jpg", width: 1600, height: 739, figure: "16-6", caption: "RD6 Groin Stretch", page: "16-5" },
   { exerciseId: "calf-stretch", src: "/images/exercises/calf-stretch.jpg", width: 1600, height: 565, figure: "16-7", caption: "RD7 Calf Stretch", page: "16-5" },
   { exerciseId: "hamstring-stretch", src: "/images/exercises/hamstring-stretch.jpg", width: 1232, height: 580, figure: "16-8", caption: "RD8 Hamstring Stretch", page: "16-6" },
+  // Added 2026-10-02 for the General Fitness view: Conditioning Drill 3, Strength Training Circuit, Free Weight Training.
+  { exerciseId: "forward-lunge", src: "/images/exercises/forward-lunge-stc.jpg", width: 1575, height: 1739, figure: "13-3", caption: "STC3 Forward Lunge", page: "13-4" },
+  { exerciseId: "step-up", src: "/images/exercises/step-up.jpg", width: 1600, height: 1659, figure: "13-4", caption: "STC4 8-Count Step-up", page: "13-5" },
+  { exerciseId: "supine-chest-press", src: "/images/exercises/supine-chest-press.jpg", width: 1586, height: 761, figure: "13-7", caption: "STC6 Supine Chest Press", page: "13-7" },
+  { exerciseId: "bent-over-row", src: "/images/exercises/bent-over-row-stc.jpg", width: 1600, height: 660, figure: "13-8", caption: "STC7 Bent-Over Row", page: "13-8" },
+  { exerciseId: "overhead-push-press", src: "/images/exercises/overhead-push-press-stc.jpg", width: 1600, height: 689, figure: "13-9", caption: "STC8 Overhead Push-Press", page: "13-9" },
+  { exerciseId: "supine-body-twist", src: "/images/exercises/supine-body-twist.jpg", width: 1600, height: 260, figure: "13-10", caption: "STC9 Supine Body Twist", page: "13-9" },
+  { exerciseId: "front-squat", src: "/images/exercises/front-squat.jpg", width: 1564, height: 1726, figure: "14-1", caption: "FW1 Front Squat", page: "14-2" },
+  { exerciseId: "back-squat", src: "/images/exercises/back-squat.jpg", width: 1600, height: 796, figure: "14-2", caption: "FW2 Back Squat", page: "14-3" },
+  { exerciseId: "bench-press", src: "/images/exercises/bench-press-bar.jpg", width: 1600, height: 754, figure: "14-6", caption: "FW4 Bench Press—straight bar", page: "14-6" },
+  { exerciseId: "bench-press", src: "/images/exercises/bench-press-dumbbell.jpg", width: 1600, height: 862, figure: "14-7", caption: "FW4 Bench Press—dumbbell", page: "14-7" },
+  { exerciseId: "heel-raise", src: "/images/exercises/heel-raise.jpg", width: 1600, height: 1704, figure: "14-12", caption: "FW7 Heel Raise", page: "14-11" },
+  { exerciseId: "bent-over-row", src: "/images/exercises/bent-over-row-fw.jpg", width: 1600, height: 1020, figure: "14-13", caption: "FW8 Bent-Over Row", page: "14-12" },
+  { exerciseId: "single-arm-bent-over-row", src: "/images/exercises/single-arm-bent-over-row.jpg", width: 1600, height: 412, figure: "14-14", caption: "FW9 Single-Arm Bent-Over Row", page: "14-13" },
+  { exerciseId: "overhead-push-press", src: "/images/exercises/overhead-push-press-fw.jpg", width: 1600, height: 623, figure: "14-17", caption: "FW11 Overhead Push-Press", page: "14-15" },
+  { exerciseId: "single-leg-deadlift", src: "/images/exercises/single-leg-deadlift.jpg", width: 1599, height: 1562, figure: "5-17", caption: "CD3.2 Single-Leg Deadlift", page: "5-15" },
+  { exerciseId: "half-squat-laterals", src: "/images/exercises/half-squat-laterals.jpg", width: 1600, height: 1340, figure: "5-22", caption: "CD3.7 Half-Squat Laterals", page: "5-20" },
 ];
 
 // The figure used as a card thumbnail when an exercise has more than one. Chosen for proportions that fit
@@ -71,6 +88,8 @@ const THUMBNAILS: Record<string, string> = {
   "windmill": "3-9",
   "straight-leg-deadlift": "13-2",
   "deadlift": "14-3",
+  "bent-over-row": "13-8",
+  "overhead-push-press": "13-9",
 };
 
 export function figuresFor(exerciseId: string): ExerciseFigure[] {

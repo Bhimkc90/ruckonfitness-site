@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { LegendNote, SourceList, Tag } from "@/components/library/LibraryBits";
-import { DemonstrationNote, ExecutionDetails, FormGuidance, hasFormGuidance } from "@/components/library/ExerciseDetail";
+import { DemonstrationNote, ExecutionDetails, FormGuidance, Substitutions, hasFormGuidance } from "@/components/library/ExerciseDetail";
 import FigureGallery from "@/components/library/FigureGallery";
 import { figuresFor } from "@/lib/library/images";
 import {
@@ -122,6 +122,12 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
               <FormGuidance exercise={exercise} />
             </Card>
           )}
+
+          {exercise.substitutions?.length ? (
+            <Card title="Substitutions" description="Alternatives described in the cited publication, and how they differ.">
+              <Substitutions exercise={exercise} heading={false} />
+            </Card>
+          ) : null}
         </div>
 
         <aside className="space-y-4">

@@ -1,6 +1,7 @@
 import type { Position, Source, SourceId, SourceRef } from "./types";
 
-export const VERIFIED_ON = "2026-09-29";
+// Re-checked 2026-10-02: the armypubs ATP 7-22.02 PDF was byte-identical to the copy checked on 2026-09-29.
+export const VERIFIED_ON = "2026-10-02";
 
 export const sources: Record<SourceId, Source> = {
   "atp-7-22-02-c1": {
@@ -28,7 +29,7 @@ export const sources: Record<SourceId, Source> = {
     url: "https://armypubs.army.mil/epubs/DR_pubs/DR_a/ARN44522-FM_7-22-002-WEB-7.pdf",
     distribution: "Approved for public release; distribution is unlimited",
     supersedes: "Chapters 1–6 and appendix D of FM 7-22, 26 October 2012",
-    verifiedOn: VERIFIED_ON,
+    verifiedOn: "2026-09-29",
     notes: ["Refers readers to ATP 7-22.02 for H2F drills and exercises."],
   },
 };

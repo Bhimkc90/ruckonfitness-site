@@ -76,7 +76,8 @@ export type MovementPattern =
   | "locomotion"
   | "run"
   | "trunk-stability"
-  | "stretch";
+  | "stretch"
+  | "ankle-extension";
 
 export type Location = "open-ground";
 
@@ -130,7 +131,8 @@ export type ExecutionStep = {
 export type DrillExecution = {
   drillId?: DrillId;
   context?: string;
-  position: PositionId;
+  // Absent when the source describes the start without naming one of its positions (e.g. bench-supported).
+  position?: PositionId;
   startingPosition: string;
   steps: ExecutionStep[];
   cadence: Cadence;
@@ -138,6 +140,14 @@ export type DrillExecution = {
   officialPrescription?: string;
   // Gaps or inconsistencies in the printed source, stated rather than filled in.
   sourceNotes?: string[];
+  source: SourceRef;
+};
+
+// An alternative the cited source itself describes, with how it differs.
+export type Substitution = {
+  exerciseId?: string; // when the alternative is also in the library
+  name: string;
+  difference: string;
   source: SourceRef;
 };
 
@@ -152,6 +162,7 @@ export type Exercise = {
   cues: string[];
   commonMistakes: string[]; // only when the source names them
   cautions: string[]; // only when the source supports them
+  substitutions?: Substitution[];
   tags: {
     purposes: Purpose[];
     equipment: readonly Equipment[];

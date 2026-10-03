@@ -6,9 +6,9 @@ import { ButtonLink } from "@/components/ui/Button";
 import { TRAINING_PLANS_ENABLED } from "@/lib/features";
 
 export const metadata: Metadata = {
-  title: "Military workout library",
+  title: "Exercise library",
   description:
-    "Army drills and exercises (Preparation, Four for the Core, Military Movement 1, Conditioning 1 and 2, Recovery, and free-weight lifts) with official instructions, cadence, and sources.",
+    "Army drills and exercises with official instructions, cadence, photos, and sources, browsable as Military/PRT drills or as General Fitness groups for AFT preparation.",
 };
 
 // The library holds reusable exercise instructions and official drill sequences only.
@@ -17,8 +17,8 @@ export default function WorkoutLibraryPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Military workout library"
-        description="Exercises and official drills from the Army's current H2F drill manual, with step-by-step instructions, official cadence, and page-level sources. Free to use, no account needed."
+        title="Exercise library"
+        description="Exercises and official drills from the Army's H2F drill manual, with step-by-step instructions, official photos, and page-level sources. Browse the official drills, or the same exercises grouped for AFT preparation."
       />
 
       <LegendNote />
@@ -44,8 +44,9 @@ export default function WorkoutLibraryPage() {
           <SourceList ids={["atp-7-22-02-c1", "fm-7-22-c2"]} />
           <p className="mt-4 text-xs text-ink-2">
             The ATP lists demonstration videos at the Central Army Registry and army.mil/aft but does not link a video to
-            each exercise, so no videos are shown here. Modified drill versions and the other drills in the ATP are not
-            included yet.
+            each exercise, so no videos are shown here. Included beyond the six drills: selected Conditioning Drill 3,
+            Strength Training Circuit, and Free Weight Training exercises. Other ATP drills and most modified versions
+            are not included yet.
           </p>
         </Card>
       </div>
