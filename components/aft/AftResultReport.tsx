@@ -9,6 +9,8 @@ import { aftScoringFile } from "@/lib/aft/scoringFile";
 import { useAftResults, type SavedAftResult } from "@/lib/storage/aftResults";
 import { PassFailBadge } from "@/components/ui/StatusBadge";
 import type { CalculatorEvent } from "./AftCalculator";
+import ExplainPanel from "@/components/explain/ExplainPanel";
+import { AI_EXPLAIN_ENABLED } from "@/lib/features";
 
 const UNSAVED_ID = "__unsaved__";
 
@@ -44,12 +46,14 @@ export default function AftResultReport({
   input,
   testDate,
   savedId,
+  outdated = false,
 }: {
   events: CalculatorEvent[];
   result: AftResult;
   input: AftInput;
   testDate: string;
   savedId: string | null;
+  outdated?: boolean;
 }) {
   const rule = aftStandardRules[result.standard];
   const progress = useProgressFor({ testDate, input, result }, savedId);
@@ -221,6 +225,13 @@ export default function AftResultReport({
           (effective {aftScoringFile.effectiveDate}).
         </p>
       </div>
+
+      {AI_EXPLAIN_ENABLED &&
+        (outdated ? (
+          <ExplainPanel key="outdated" result={result} previousComparable={null} disabledReason="Recalculate to explain the current entries." />
+        ) : (
+          <ExplainPanel result={result} previousComparable={comparable?.result ?? null} />
+        ))}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { AftEventCode, AftInput } from "@/lib/aft/types";
 import { MIN_AFT_AGE, scoreAft } from "@/lib/aft/scoring";
 import { aftScoringFile } from "@/lib/aft/scoringFile";
+import { RAW_LIMITS, isWithin as inRange } from "@/lib/aft/limits";
 import { AFT_RESULTS_SCHEMA_VERSION, findDuplicate, isSavedResult, type SavedAftResult } from "@/lib/storage/aftResults";
 import { TRAINING_SCHEMA_VERSION, parseTrainingData, type TrainingData } from "@/lib/storage/trainingPlans";
 import { parseProfile, type SoldierProfile } from "@/lib/profile/profile";
@@ -68,16 +69,6 @@ const EVENTS: AftEventCode[] = ["MDL", "HRP", "SDC", "PLK", "2MR"];
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const isDate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isTimestamp = (v: unknown) => typeof v === "string" && !Number.isNaN(Date.parse(v));
-
-// Same limits as the calculator form (lib/aft/validation.ts): whole numbers only, times above 0:00.
-const RAW_LIMITS: Record<AftEventCode, { min: number; max: number }> = {
-  MDL: { min: 0, max: 1000 },
-  HRP: { min: 0, max: 300 },
-  SDC: { min: 1, max: 99 * 60 + 59 },
-  PLK: { min: 1, max: 99 * 60 + 59 },
-  "2MR": { min: 1, max: 99 * 60 + 59 },
-};
-const inRange = (v: unknown, min: number, max: number) => typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
 
 function validInput(input: unknown): input is AftInput {
   if (!isObject(input) || !isObject(input.raw)) return false;

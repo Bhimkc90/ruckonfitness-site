@@ -333,7 +333,7 @@ export default function AftCalculator({ events, guides }: { events: CalculatorEv
 
             {/* Out-of-date results keep full contrast; the dashed frame, banner, and badge mark them instead of fading. */}
             <div className={outdated ? "rounded-lg border-2 border-dashed border-warn p-3 sm:p-4" : undefined}>
-              <AftResultReport events={events} result={calculation.result} input={calculation.input} testDate={calculation.testDate} savedId={savedId} />
+              <AftResultReport events={events} result={calculation.result} input={calculation.input} testDate={calculation.testDate} savedId={savedId} outdated={outdated} />
             </div>
 
             <div className="flex flex-col gap-3 border-t border-line pt-4 sm:flex-row sm:flex-wrap sm:items-start">

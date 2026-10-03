@@ -11,7 +11,8 @@ import { Card } from "@/components/ui/Card";
 import { ButtonLink } from "@/components/ui/Button";
 import { Chip, PassFailBadge, EventPoints } from "@/components/ui/StatusBadge";
 import Link from "next/link";
-import { TRAINING_PLANS_ENABLED } from "@/lib/features";
+import { AI_EXPLAIN_ENABLED, TRAINING_PLANS_ENABLED } from "@/lib/features";
+import ExplainPanel from "@/components/explain/ExplainPanel";
 
 function PointsChange({ value }: { value: number | null }) {
   if (value === null) return <span className="text-ink-2">—</span>;
@@ -191,6 +192,12 @@ function HistoryEntry({ item, linked }: { item: TestProgress; linked: boolean })
         </button>
         </div>
       </footer>
+
+      {AI_EXPLAIN_ENABLED && (
+        <div className="mt-3">
+          <ExplainPanel result={result} previousComparable={item.previousComparable?.result ?? null} />
+        </div>
+      )}
     </article>
   );
 }

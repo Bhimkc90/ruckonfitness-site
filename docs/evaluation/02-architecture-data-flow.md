@@ -3,7 +3,9 @@
 ## Architecture
 
 - Next.js 16.3.8 App Router. Every route is prerendered static HTML plus client-side JavaScript.
-- There are **no** API routes, server actions, middleware, databases, accounts, or authentication.
+- There are no server actions, middleware, databases, accounts, or authentication. One API route,
+  `POST /api/explain` (AI explanations), exists but is **off in production** and returns 404 until released
+  (`docs/ai-explanations.md`).
 - Hosting: Vercel (project `ruckonfitness-site`, production branch `main`, custom domain `ruckonfitness.com`).
 - Source: public GitHub repository. Images, fonts and the score-table PDF are served from the same origin.
 
@@ -30,7 +32,8 @@ Backups are JSON files that the user downloads and chooses where to keep. They a
 | Flow | What is sent | Verified how |
 |---|---|---|
 | Page and asset requests to Vercel | Standard HTTP request data (IP address, user agent, URL, referrer) as with any website; Vercel keeps platform logs | Inherent to hosting |
-| AFT entries, profile, plans, notes | **Nothing.** The app makes no data requests (`connect-src 'self'` and no `fetch` in the code) | Code search; CSP |
+| AFT entries, profile, plans, notes | **Nothing** while AI explanations are off (the production default) | Code search; CSP |
+| AI explanations (when released) | Only after consent: scoring category with age band, and raw event results of one test and its previous comparable test. Sent to RuckOn's endpoint, then to an AI model through Vercel AI Gateway. Hashed IP for rate limits. No names, ages, dates, IDs, notes or profile | `lib/explain/request.ts`; tests |
 | Analytics | **None loaded.** Vercel Web Analytics and Speed Insights are switched on in the project settings, but no analytics package is installed, no script appears in the live HTML, and `/_vercel/insights/script.js` returns 404 | `curl` of live pages on 3 Oct 2026 |
 | Outbound links | Opened only when the user clicks: army.mil, armypubs.army.mil, YouTube (official AFT videos), bhimbkc.com. Videos are links, not embeds | Code search |
 | URLs | No personal data is put in URLs or query strings | Code search |

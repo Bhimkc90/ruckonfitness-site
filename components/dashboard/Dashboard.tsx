@@ -31,7 +31,8 @@ import { PassFailBadge } from "@/components/ui/StatusBadge";
 import TrendChart, { type TrendPoint } from "./TrendChart";
 import DashboardPlanCard from "@/components/training/DashboardPlanCard";
 import DashboardProfileCard from "@/components/profile/DashboardProfileCard";
-import { TRAINING_PLANS_ENABLED } from "@/lib/features";
+import { AI_EXPLAIN_ENABLED, TRAINING_PLANS_ENABLED } from "@/lib/features";
+import ExplainPanel from "@/components/explain/ExplainPanel";
 
 type Mode = "points" | "raw";
 
@@ -224,6 +225,8 @@ export default function Dashboard() {
           <p className="mt-1 text-sm text-ink-2">{latestResult.weakest[0].points} points</p>
         </Card>
       </div>
+
+      {AI_EXPLAIN_ENABLED && <ExplainPanel result={latestResult} previousComparable={latest.previousComparable?.result ?? null} />}
 
       <Card
         title="Total score over time"
