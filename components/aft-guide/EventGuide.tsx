@@ -276,7 +276,7 @@ export default function EventGuide({ event, idPrefix = "", level = 2 }: { event:
           </a>
         </div>
 
-        <Sub className="mt-5 font-semibold">Prepare with the workout library</Sub>
+        <Sub className="mt-5 font-semibold">Prepare with the exercise library</Sub>
         <p className="mt-1 text-ink-2">
           The ATP starts every AFT with the{" "}
           <Link href={drillHref(preparationDrill.id)} className="font-medium text-accent-ink underline-offset-2 hover:underline">

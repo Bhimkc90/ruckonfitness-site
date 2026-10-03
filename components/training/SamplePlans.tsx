@@ -50,7 +50,7 @@ export default function SamplePlans({ samples }: { samples: SamplePlan[] }) {
           <li>Starting a plan, rescheduling sessions, logging completed workouts, and tracking progress on the dashboard.</li>
         </ul>
         <div className="mt-4 flex flex-wrap gap-2">
-          <ButtonLink href="/workouts">Open the workout library</ButtonLink>
+          <ButtonLink href="/workouts">Open the exercise library</ButtonLink>
           <ButtonLink href="/aft-calculator" variant="secondary">
             Score an AFT
           </ButtonLink>

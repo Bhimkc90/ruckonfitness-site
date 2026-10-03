@@ -154,3 +154,14 @@ describe("findDuplicate", () => {
     ).toBeUndefined();
   });
 });
+
+describe("formatInstantDate", () => {
+  it("shows a timestamp as the date in the reader's time zone, not the UTC date", async () => {
+    const { formatInstantDate } = await import("./format");
+    const iso = "2026-10-03T00:50:24.763Z";
+    const local = new Date(iso);
+    const expected = new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric" }).format(local);
+    expect(formatInstantDate(iso)).toBe(expected);
+    expect(formatInstantDate(iso)).toContain(String(local.getDate()));
+  });
+});

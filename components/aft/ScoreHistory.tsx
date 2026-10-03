@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { ArrowDownRight, ArrowUpRight, Info, Minus, Trash2 } from "lucide-react";
 import { aftEventInfo } from "@/lib/aft/scoring";
 import { aftStandardRules } from "@/lib/aft/rules";
@@ -25,8 +25,16 @@ function PointsChange({ value }: { value: number | null }) {
   );
 }
 
+// The linked entry from /score-history#result-<id>. Read from the URL rather than relying on :target, which
+// does not apply when the page is reached by in-app navigation.
+function subscribeHash(onChange: () => void) {
+  window.addEventListener("hashchange", onChange);
+  return () => window.removeEventListener("hashchange", onChange);
+}
+
 export default function ScoreHistory() {
   const hydrated = useHydrated();
+  const linkedId = useSyncExternalStore(subscribeHash, () => window.location.hash.slice(1), () => "");
   const results = useAftResults();
   const progress = buildProgress(results);
 
@@ -64,19 +72,23 @@ export default function ScoreHistory() {
     <div className="space-y-4">
       {storageNote}
       {[...progress].reverse().map((item) => (
-        <HistoryEntry key={item.record.id} item={item} />
+        <HistoryEntry key={item.record.id} item={item} linked={linkedId === `result-${item.record.id}`} />
       ))}
     </div>
   );
 }
 
-function HistoryEntry({ item }: { item: TestProgress }) {
+function HistoryEntry({ item, linked }: { item: TestProgress; linked: boolean }) {
   const { record } = item;
   const result = record.result;
   const rule = aftStandardRules[result.standard];
 
   return (
-    <article id={`result-${record.id}`} className="scroll-mt-28 rounded-xl border border-card-line bg-surface shadow-sm p-4 sm:p-5 lg:scroll-mt-6">
+    <article
+      id={`result-${record.id}`}
+      aria-current={linked ? "true" : undefined}
+      className={`scroll-mt-28 rounded-xl border border-card-line bg-surface p-4 shadow-sm sm:p-5 lg:scroll-mt-6 ${linked ? "linked-result" : ""}`}
+    >
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold text-ink">{testLabel(item)}</h2>

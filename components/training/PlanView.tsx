@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardPlus, Info, RotateCcw } from "lucide-react";
-import { formatTestDate } from "@/lib/aft/format";
+import { formatInstantDate, formatTestDate } from "@/lib/aft/format";
 import { useAftResults, useHydrated } from "@/lib/storage/aftResults";
 import {
   activePlan,
@@ -274,7 +274,7 @@ function SessionRow({
           {completion ? (
             <div className="rounded-lg border border-line p-3 text-sm">
               <p className="text-ink">
-                Recorded {formatTestDate(completion.completedAt.slice(0, 10))} · {difficultyLabels[completion.difficulty]}
+                Recorded {formatInstantDate(completion.completedAt)} · {difficultyLabels[completion.difficulty]}
                 {completion.pain ? " · pain reported" : ""}
               </p>
               {completion.notes && <p className="mt-1 text-ink-2">{completion.notes}</p>}

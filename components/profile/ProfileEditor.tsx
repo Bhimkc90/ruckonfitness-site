@@ -5,7 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, Download, Info, Pencil, Trash2 } from "lucide-react";
 import type { AftStandard, Gender } from "@/lib/aft/types";
 import { aftStandardRules } from "@/lib/aft/rules";
-import { columnLabel, formatTestDate } from "@/lib/aft/format";
+import { columnLabel, formatInstantDate, formatTestDate } from "@/lib/aft/format";
 import { localToday } from "@/lib/aft/validation";
 import { useHydrated } from "@/lib/storage/aftResults";
 import { deleteProfile, saveProfile, useProfile } from "@/lib/storage/profile";
@@ -137,7 +137,7 @@ function ProfileSummary({ profile, onNotice }: { profile: SoldierProfile; onNoti
 
   return (
     <div className="grid gap-5 lg:grid-cols-2 [&>*]:min-w-0">
-      <Card title={profile.displayName || "Your profile"} description={profile.updatedAt ? `Last saved ${formatTestDate(profile.updatedAt.slice(0, 10))}.` : undefined}>
+      <Card title={profile.displayName || "Your profile"} description={profile.updatedAt ? `Last saved ${formatInstantDate(profile.updatedAt)}.` : undefined}>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-2">Scoring</h3>
         <dl className="mt-1">
           <Row

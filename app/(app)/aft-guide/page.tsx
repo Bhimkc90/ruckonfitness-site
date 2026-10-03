@@ -27,7 +27,7 @@ export default function AftGuidePage() {
           <>
             <ButtonLink href="/aft-calculator">Record AFT</ButtonLink>
             <ButtonLink href="/workouts" variant="secondary">
-              Workout library
+              Exercise library
             </ButtonLink>
           </>
         }
@@ -126,7 +126,7 @@ export default function AftGuidePage() {
           <Link href={drillHref("recovery-drill")} className="text-accent-ink hover:underline">
             Recovery Drill
           </Link>{" "}
-          in the workout library.
+          in the exercise library.
         </p>
       </GuideSection>
 

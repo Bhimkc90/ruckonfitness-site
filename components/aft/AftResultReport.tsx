@@ -132,7 +132,9 @@ export default function AftResultReport({
             <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             {previous
               ? "No earlier saved test uses the same scoring category, so points are not compared."
-              : "No earlier saved test to compare with. Save this result to track changes."}
+              : savedId
+                ? "No earlier saved test to compare with. Later tests will be compared with this one."
+                : "No earlier saved test to compare with. Save this result to track changes."}
           </p>
         )}
         {notComparable && (

@@ -4,6 +4,7 @@ import { useId, useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Download, FileUp, Trash2 } from "lucide-react";
 import { aftEventInfo } from "@/lib/aft/scoring";
+import { localToday } from "@/lib/aft/validation";
 import { useAftResults, useHydrated } from "@/lib/storage/aftResults";
 import { useTrainingData } from "@/lib/storage/trainingPlans";
 import { useProfile } from "@/lib/storage/profile";
@@ -20,7 +21,7 @@ import {
   type LocalData,
 } from "@/lib/backup/backup";
 import type { AftEventCode } from "@/lib/aft/types";
-import { formatTestDate } from "@/lib/aft/format";
+import { formatInstantDate } from "@/lib/aft/format";
 import { Card } from "@/components/ui/Card";
 import { buttonClass } from "@/components/ui/Button";
 import { inputClass } from "@/components/ui/form";
@@ -41,19 +42,24 @@ function StatusLine({ notice }: { notice: Notice }) {
   );
 }
 
+// Downloads a backup and returns its file name. The name uses the local date, so an evening export is not
+// labeled with tomorrow's UTC date.
 function useExport(appVersion: string) {
-  return () => {
-    const now = new Date();
-    const backup = createBackup(readLocalData(), { exportedAt: now.toISOString(), appVersion });
+  return (): string => {
+    const backup = createBackup(readLocalData(), { exportedAt: new Date().toISOString(), appVersion });
     const blob = new Blob([serializeBackup(backup)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
+    const fileName = `ruckon-backup-${localToday()}.json`;
     const a = document.createElement("a");
     a.href = url;
-    a.download = `ruckon-backup-${now.toISOString().slice(0, 10)}.json`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
+    return fileName;
   };
 }
+
+const exportedNotice = (fileName: string): Notice => ({ kind: "ok", message: `Backup downloaded as ${fileName}. Keep it somewhere safe; it contains your saved data.` });
 
 export default function SettingsPanel({ appVersion }: { appVersion: string }) {
   const hydrated = useHydrated();
@@ -92,7 +98,7 @@ function PreferencesCard() {
           <span className="text-ink-2">App start page</span>
           <select
             value={settings.landingPage}
-            onChange={(e) => update({ landingPage: e.target.value as LandingPage }, "Start page")}
+            onChange={(e) => update({ landingPage: e.target.value as LandingPage }, "App start page")}
             className={inputClass}
           >
             {LANDING_PAGES.map((p) => (
@@ -285,7 +291,7 @@ function DataCard({ appVersion }: { appVersion: string }) {
         <div className="rounded-lg border border-line p-4">
           <h3 className="text-sm font-semibold text-ink">Export a backup</h3>
           <p className="mt-1 text-sm text-ink-2">A JSON file (backup version 1) with your AFT history, training plans and completed workouts, profile, and app preferences.</p>
-          <button type="button" onClick={exportBackup} className={buttonClass("primary", "mt-3")}>
+          <button type="button" onClick={() => setNotice(exportedNotice(exportBackup()))} className={buttonClass("primary", "mt-3")}>
             <Download className="h-4 w-4" aria-hidden />
             Export all data
           </button>
@@ -318,7 +324,7 @@ function DataCard({ appVersion }: { appVersion: string }) {
             Import preview: {pending.fileName}
           </h3>
           <p className="mt-1 text-xs text-ink-2">
-            Exported {formatTestDate(pending.backup.exportedAt.slice(0, 10))} from RuckOn {pending.backup.appVersion}. Nothing has been saved yet.
+            Exported {formatInstantDate(pending.backup.exportedAt)} from RuckOn {pending.backup.appVersion}. Nothing has been saved yet.
           </p>
 
           <fieldset className="mt-3 text-sm">
@@ -390,7 +396,7 @@ function DataCard({ appVersion }: { appVersion: string }) {
               {mode === "merge" ? "Merge backup" : "Replace my data"}
             </button>
             {mode === "replace" && (
-              <button type="button" onClick={exportBackup} className={buttonClass("secondary")}>
+              <button type="button" onClick={() => setNotice(exportedNotice(exportBackup()))} className={buttonClass("secondary")}>
                 <Download className="h-4 w-4" aria-hidden />
                 Export current data first
               </button>
@@ -458,7 +464,7 @@ function DeleteCard({ appVersion }: { appVersion: string }) {
         <button
           type="button"
           ref={(el) => el?.focus()}
-          onClick={exportBackup}
+          onClick={() => setNotice(exportedNotice(exportBackup()))}
           className={buttonClass("secondary")}
         >
           <Download className="h-4 w-4" aria-hidden />

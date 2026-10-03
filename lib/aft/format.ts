@@ -62,6 +62,14 @@ export function formatTestDate(value: string, style: "long" | "short" = "long"):
   return (style === "long" ? longDate : shortDate).format(date);
 }
 
+const localDate = new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric" });
+
+// Timestamps (saved, exported, completed) are instants; show them as the date in the reader's time zone, so an
+// evening save in the U.S. is not labeled with the next day's UTC date.
+export function formatInstantDate(iso: string): string {
+  return localDate.format(new Date(iso));
+}
+
 export function columnLabel(column: Gender): string {
   return column === "M" ? "Male | Combat" : "Female";
 }
