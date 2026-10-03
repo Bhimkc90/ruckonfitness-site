@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 
 const noopSubscribe = () => () => {};
+const FOUNDER_URL = "https://www.bhimbkc.com/";
 // Pages are prerendered, so the HTML carries the build year; the browser shows the current year.
 const BUILD_YEAR = new Date().getFullYear();
 
@@ -13,7 +14,16 @@ export default function SiteCredit({ className = "" }: { className?: string }) {
     <p className={`text-xs leading-relaxed text-ink-2 ${className}`}>
       <span className="block sm:inline">© {year} RuckOn Fitness LLC. All rights reserved.</span>{" "}
       <span className="block sm:inline">
-        Founded and built by <span className="font-semibold text-ink">Bhim KC</span>.
+        Founded and built by{" "}
+        <a
+          href={FOUNDER_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-sm font-semibold text-ink underline decoration-line-strong decoration-1 underline-offset-2 transition-colors hover:decoration-ink hover:decoration-2"
+        >
+          Bhim KC<span className="sr-only"> (opens in a new tab)</span>
+        </a>
+        .
       </span>
     </p>
   );
