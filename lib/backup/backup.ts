@@ -1,4 +1,6 @@
-import type { AftEventCode } from "@/lib/aft/types";
+import type { AftEventCode, AftInput } from "@/lib/aft/types";
+import { MIN_AFT_AGE, scoreAft } from "@/lib/aft/scoring";
+import { aftScoringFile } from "@/lib/aft/scoringFile";
 import { AFT_RESULTS_SCHEMA_VERSION, findDuplicate, isSavedResult, type SavedAftResult } from "@/lib/storage/aftResults";
 import { TRAINING_SCHEMA_VERSION, parseTrainingData, type TrainingData } from "@/lib/storage/trainingPlans";
 import { parseProfile, type SoldierProfile } from "@/lib/profile/profile";
@@ -67,14 +69,24 @@ const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 const isDate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isTimestamp = (v: unknown) => typeof v === "string" && !Number.isNaN(Date.parse(v));
 
-function validInput(input: unknown): boolean {
+// Same limits as the calculator form (lib/aft/validation.ts): whole numbers only, times above 0:00.
+const RAW_LIMITS: Record<AftEventCode, { min: number; max: number }> = {
+  MDL: { min: 0, max: 1000 },
+  HRP: { min: 0, max: 300 },
+  SDC: { min: 1, max: 99 * 60 + 59 },
+  PLK: { min: 1, max: 99 * 60 + 59 },
+  "2MR": { min: 1, max: 99 * 60 + 59 },
+};
+const inRange = (v: unknown, min: number, max: number) => typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
+
+function validInput(input: unknown): input is AftInput {
   if (!isObject(input) || !isObject(input.raw)) return false;
   const raw = input.raw;
   return (
-    typeof input.age === "number" &&
+    inRange(input.age, MIN_AFT_AGE, 99) &&
     (input.standard === "general" || input.standard === "combat") &&
-    (input.gender === "M" || input.gender === "F" || input.gender === null) &&
-    EVENTS.every((e) => typeof raw[e] === "number" && Number.isFinite(raw[e]))
+    (input.gender === "M" || input.gender === "F" || (input.gender === null && input.standard === "combat")) &&
+    EVENTS.every((e) => inRange(raw[e], RAW_LIMITS[e].min, RAW_LIMITS[e].max))
   );
 }
 
@@ -83,9 +95,40 @@ function validResult(result: unknown): boolean {
   return EVENTS.every((e) => (result.events as unknown[]).some((x) => isObject(x) && x.event === e && typeof x.points === "number" && typeof x.raw === "number"));
 }
 
-function validSavedResult(item: unknown): item is SavedAftResult {
-  return isSavedResult(item) && isDate(item.testDate) && isTimestamp(item.savedAt) && validInput(item.input) && validResult(item.result);
+// A result saved with the current score tables must match what the calculator gives for its entries, so an edited
+// backup can't show points, a total, or a pass that the entries didn't earn. Results from other table versions are
+// kept as saved, since they can't be re-scored here.
+function scoresMatch(input: AftInput, result: Record<string, unknown>): boolean {
+  const fresh = scoreAft(input);
+  const events = result.events as { event: AftEventCode; raw: number; points: number }[];
+  return (
+    result.ageGroup === fresh.ageGroup &&
+    result.column === fresh.column &&
+    result.standard === fresh.standard &&
+    result.total === fresh.total &&
+    result.passed === fresh.passed &&
+    events.length === fresh.events.length &&
+    fresh.events.every((f) => events.some((e) => e.event === f.event && e.raw === f.raw && e.points === f.points))
+  );
 }
+
+function consistent(scoringVersion: unknown, input: AftInput, result: Record<string, unknown>): boolean {
+  return scoringVersion !== aftScoringFile.fileName || scoresMatch(input, result);
+}
+
+function validSavedResult(item: unknown): item is SavedAftResult {
+  return (
+    isSavedResult(item) &&
+    isDate(item.testDate) &&
+    isTimestamp(item.savedAt) &&
+    validInput(item.input) &&
+    validResult(item.result) &&
+    consistent(item.scoringVersion, item.input, item.result as unknown as Record<string, unknown>)
+  );
+}
+
+// Shown in the import preview, so only a plain version number is accepted.
+const safeAppVersion = (v: unknown) => (typeof v === "string" && /^\d{1,4}\.\d{1,4}\.\d{1,4}(-[0-9A-Za-z.-]{1,32})?$/.test(v) ? v : "unknown");
 
 function validPlan(plan: StoredPlan): boolean {
   const b = plan.baseline;
@@ -174,7 +217,7 @@ export function validateBackup(text: string): BackupValidation {
   const local: LocalData = { aftResults: results, training, profile, settings };
   return {
     ok: true,
-    backup: createBackup(local, { exportedAt: parsed.exportedAt as string, appVersion: typeof parsed.appVersion === "string" ? parsed.appVersion : "unknown" }),
+    backup: createBackup(local, { exportedAt: parsed.exportedAt as string, appVersion: safeAppVersion(parsed.appVersion) }),
     data: local,
   };
 }

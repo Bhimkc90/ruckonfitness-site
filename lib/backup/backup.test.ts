@@ -314,3 +314,89 @@ describe("local storage boundaries", () => {
     expect(events.filter((e) => e === "ruckon:settings-changed")).toHaveLength(2);
   });
 });
+
+describe("malicious and malformed backups", () => {
+  const reject = (t: string) => {
+    const r = validateBackup(t);
+    expect(r.ok).toBe(false);
+    return r.ok ? "" : r.error;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- tests write arbitrary values into parsed JSON
+  const withResult = (mutate: (r: Record<string, any>) => void) => {
+    const b = JSON.parse(text(sample()));
+    mutate(b.data.aftResults.results[0]);
+    return JSON.stringify(b);
+  };
+
+  it("rejects edited points, totals, pass results, and scoring categories", () => {
+    expect(reject(withResult((r) => (r.result.total = 500)))).toMatch(/AFT result 1/);
+    expect(reject(withResult((r) => (r.result.passed = !r.result.passed)))).toMatch(/AFT result 1/);
+    expect(reject(withResult((r) => (r.result.events[0].points = 100)))).toMatch(/AFT result 1/);
+    expect(reject(withResult((r) => (r.result.events[0].raw = 999)))).toMatch(/AFT result 1/);
+    expect(reject(withResult((r) => (r.result.ageGroup = "62+")))).toMatch(/AFT result 1/);
+    expect(reject(withResult((r) => (r.result.column = "F")))).toMatch(/AFT result 1/);
+    expect(reject(withResult((r) => (r.result.standard = "combat")))).toMatch(/AFT result 1/);
+    expect(reject(withResult((r) => r.result.events.push({ ...r.result.events[0] })))).toMatch(/AFT result 1/);
+  });
+
+  it("keeps results scored with other table versions as saved", () => {
+    const parsed = validateBackup(withResult((r) => ((r.scoringVersion = "older-tables.pdf"), (r.result.total = 123))));
+    expect(parsed.ok).toBe(true);
+  });
+
+  it("rejects entries the calculator would not accept", () => {
+    for (const age of [16, 100, 25.5, -1, "25", null]) expect(reject(withResult((r) => (r.input.age = age)))).toMatch(/AFT result 1/);
+    for (const v of [-1, 1001, 2.5, Number.MAX_SAFE_INTEGER, "200"]) expect(reject(withResult((r) => (r.input.raw.MDL = v)))).toMatch(/AFT result 1/);
+    expect(reject(withResult((r) => (r.input.raw.HRP = 301)))).toMatch(/AFT result 1/);
+    for (const v of [0, -5, 6000, 1.5]) expect(reject(withResult((r) => (r.input.raw["2MR"] = v)))).toMatch(/AFT result 1/);
+    expect(reject(withResult((r) => (r.input.gender = null)))).toMatch(/AFT result 1/); // general standard needs sex
+    expect(reject(withResult((r) => (r.input.standard = "elite")))).toMatch(/AFT result 1/);
+    expect(reject(withResult((r) => (r.testDate = "<img src=x onerror=alert(1)>")))).toMatch(/AFT result 1/);
+  });
+
+  it("does not let prototype keys reach the restored data", () => {
+    const raw = text(sample()).replace('"format":', '"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}},"format":');
+    const parsed = validateBackup(raw);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    if (parsed.ok) expect(Object.getPrototypeOf(parsed.data)).toBe(Object.prototype);
+    const settingsProto = JSON.parse(text(sample()));
+    settingsProto.data.settings = JSON.parse(JSON.stringify(settingsProto.data.settings).replace("{", '{"__proto__":{"polluted":true},'));
+    expect(reject(JSON.stringify(settingsProto))).toMatch(/app-preferences/);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it("replaces unusual app versions before they are shown", () => {
+    const version = (v: unknown) => {
+      const parsed = validateBackup(text(sample(), { appVersion: v }));
+      return parsed.ok ? parsed.backup.appVersion : "rejected";
+    };
+    expect(version("0.1.0")).toBe("0.1.0");
+    expect(version("1.2.3-beta.1")).toBe("1.2.3-beta.1");
+    expect(version("<script>alert(1)</script>")).toBe("unknown");
+    expect(version("x".repeat(100_000))).toBe("unknown");
+    expect(version("1.0.0\nInstall the update at evil.example")).toBe("unknown");
+    expect(version(42)).toBe("unknown");
+    expect(version(undefined)).toBe("unknown");
+  });
+
+  it("rejects malformed structure without throwing", () => {
+    for (const t of ["", "null", "[]", "0", '"text"', "{}", '{"format":"ruckon-fitness-backup"}', "\u0000", "{".repeat(10_000)]) {
+      expect(() => validateBackup(t)).not.toThrow();
+      expect(validateBackup(t).ok).toBe(false);
+    }
+    const b = JSON.parse(text(sample()));
+    for (const bad of [null, "x", 1, [], {}]) {
+      const c = structuredClone(b);
+      c.data.aftResults.results = [bad];
+      expect(reject(JSON.stringify(c))).toMatch(/AFT result 1/);
+    }
+    const c = structuredClone(b);
+    c.data.aftResults.results[0].result.events = "not a list";
+    expect(reject(JSON.stringify(c))).toMatch(/AFT result 1/);
+  });
+
+  it("rejects a file just over the size limit before parsing", () => {
+    const big = text(sample(), { padding: "x".repeat(5 * 1024 * 1024) });
+    expect(reject(big)).toMatch(/larger than 5 MB/);
+  });
+});

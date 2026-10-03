@@ -16,6 +16,7 @@ import {
   planImport,
   serializeBackup,
   validateBackup,
+  MAX_BACKUP_BYTES,
   type Backup,
   type ImportMode,
   type LocalData,
@@ -220,6 +221,12 @@ function DataCard({ appVersion }: { appVersion: string }) {
     setConfirmed(false);
     setMode("merge");
     if (!file) return;
+    // Checked before reading, so a very large file is never loaded into memory.
+    if (file.size > MAX_BACKUP_BYTES) {
+      setNotice({ kind: "error", message: "This file is larger than 5 MB, which is too big to be a RuckOn backup. Nothing was changed." });
+      if (fileInput.current) fileInput.current.value = "";
+      return;
+    }
     let text: string;
     try {
       text = await file.text();
