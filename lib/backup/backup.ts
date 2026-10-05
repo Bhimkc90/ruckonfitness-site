@@ -132,6 +132,13 @@ function validPlan(plan: StoredPlan): boolean {
     isDate(plan.startDate) &&
     isTimestamp(plan.createdAt) &&
     (plan.status === "active" || plan.status === "ended") &&
+    (plan.reassessmentLink === undefined ||
+      (isObject(plan.reassessmentLink) &&
+        typeof plan.reassessmentLink.resultId === "string" &&
+        isDate(plan.reassessmentLink.testDate) &&
+        isTimestamp(plan.reassessmentLink.linkedAt) &&
+        validInput(plan.reassessmentLink.input) &&
+        validResult(plan.reassessmentLink.result))) &&
     isObject(plan.preferences) &&
     isObject(plan.reschedules) &&
     plan.sessions.every((s) => isObject(s) && typeof s.id === "string")

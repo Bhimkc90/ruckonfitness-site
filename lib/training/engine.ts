@@ -5,7 +5,7 @@ import { describeCategory, formatRaw } from "@/lib/aft/format";
 import { formatSeconds } from "@/lib/aft/validation";
 import { getDrill, getExercise } from "@/lib/library";
 import type { DrillId } from "@/lib/library/types";
-import { ASSUMPTIONS, CONDENSED_PD, MINUTES, S, TEMPLATE_VERSION, runningLimits } from "./templates";
+import { ASSUMPTIONS, CONDENSED_PD, MINUTES, PLAN_WEEKS, S, TEMPLATE_VERSION, runningLimits } from "./templates";
 import type {
   BaselineSnapshot,
   EventAnalysis,
@@ -20,6 +20,7 @@ import type {
   Restriction,
   Screening,
   SessionKind,
+  Timeline,
   WeekdayId,
 } from "./types";
 
@@ -129,7 +130,9 @@ export function exerciseAllowed(exerciseId: string, restrictions: Set<Restrictio
   if (restrictions.has("no-jumping") && exercise.tags.impact === "jumping") return false;
   if (restrictions.has("no-loaded-lifting") && !exercise.tags.equipment.includes("none")) return false;
   if (restrictions.has("no-weight-on-hands")) {
-    if (exercise.tags.movementPatterns.includes("push")) return false;
+    // Bodyweight pushing is done from the hands; loaded presses (Bench Press, Supine Chest Press, Overhead
+    // Push-Press) are not, so they stay available.
+    if (exercise.tags.movementPatterns.includes("push") && exercise.tags.equipment.includes("none")) return false;
     if (exercise.executions.some((x) => x.position !== undefined && HANDS_POSITIONS.has(x.position))) return false;
   }
   return true;
@@ -283,14 +286,64 @@ function mdlBlock(ctx: Ctx): PlanBlock {
   };
 }
 
+// A loaded press for push-up development, or in place of push-ups when weight on the hands is restricted.
+// Null without suitable equipment or when the user avoids lifting weights.
+function pressItem(ctx: Ctx, develop: boolean): { item: PlanItem; minutes: number; source: string } | null {
+  if (ctx.restrictions.has("no-loaded-lifting")) return null;
+  const equipment = new Set(ctx.prefs.equipment);
+  if (equipment.has("kettlebell")) {
+    const p = (rounds: string): Prescription => ({
+      sets: rounds,
+      time: "1 minute",
+      rest: "60 seconds between rounds",
+      intensity: "Kettlebells you can press with control for the whole minute; rest or lighten them if form slips",
+    });
+    return {
+      item: { kind: "exercise", exerciseId: "supine-chest-press", prescription: { foundation: p("2 rounds"), build: p(develop ? "3 rounds" : "2 rounds") } },
+      minutes: develop ? 5 : 3,
+      source: S.stcChestPress,
+    };
+  }
+  if (equipment.has("barbell-or-hex-bar") || equipment.has("dumbbell")) {
+    const p = (sets: string): Prescription => ({
+      sets,
+      reps: "8–10",
+      rest: "90 seconds",
+      intensity: "RPE 6–7: finish each set with 3–4 good repetitions left. Lower and press with control, hips on the bench; do not test a maximum",
+      notes: "Use a spotter at the head of the bench (ATP 7-22.02 para 14-12)",
+    });
+    return {
+      item: { kind: "exercise", exerciseId: "bench-press", prescription: { foundation: p("2"), build: p(develop ? "3" : "2") } },
+      minutes: develop ? 7 : 5,
+      source: S.fwBench,
+    };
+  }
+  return null;
+}
+
 function hrpBlock(ctx: Ctx): PlanBlock | null {
   const develop = ctx.roles.HRP === "develop";
   if (ctx.restrictions.has("no-weight-on-hands")) {
-    ctx.limitations.add("Hand-release push-up: you asked to avoid weight on your hands, and the library has no substitute that trains this event.");
-    return null;
+    const press = pressItem(ctx, develop);
+    if (!press) {
+      ctx.limitations.add("Hand-release push-up: you asked to avoid weight on your hands, and without equipment for a lying press the library has no substitute that trains this event.");
+      return null;
+    }
+    ctx.limitations.add("Hand-release push-up: you asked to avoid weight on your hands, so a lying press replaces push-up practice. It works the pushing muscles but does not train the event itself.");
+    return {
+      id: develop ? "hrp-develop" : "hrp-maintain",
+      title: develop ? "Pressing in place of push-ups (development)" : "Pressing in place of push-ups (maintenance)",
+      minutes: press.minutes,
+      items: [press.item],
+      sources: [press.source, S.pushSubstitute, S.loadTable, S.rpe],
+      assumptions: [ASSUMPTIONS.pushAccessory],
+    };
   }
   const baseline = ctx.baseline.result.events.find((e) => e.event === "HRP")!.raw;
   const items: PlanItem[] = [];
+  const sources: string[] = [S.remote, S.aftHrp, S.cd];
+  const assumptions: string[] = [ASSUMPTIONS.hrpPractice];
+  let minutes = develop ? 9 : 5;
   if (baseline > 0) {
     const perSet = baseline >= 10 ? Math.min(25, Math.max(5, Math.round(baseline / 2))) : Math.max(1, Math.round(baseline / 2));
     const p = (sets: string): Prescription => ({
@@ -310,13 +363,22 @@ function hrpBlock(ctx: Ctx): PlanBlock | null {
       prescription: { foundation: { sets: "1", reps: "5", intensity: "Moderate cadence" }, build: { sets: "1", reps: "up to 10", intensity: "Moderate cadence" } },
     });
   }
+  if (develop) {
+    const press = pressItem(ctx, true);
+    if (press) {
+      items.push(press.item);
+      minutes += press.minutes;
+      sources.push(press.source, S.loadTable);
+      assumptions.push(ASSUMPTIONS.pushAccessory);
+    }
+  }
   return {
     id: develop ? "hrp-develop" : "hrp-maintain",
     title: develop ? "Hand-release push-up development" : "Hand-release push-up maintenance",
-    minutes: develop ? 9 : 5,
+    minutes,
     items,
-    sources: [S.remote, S.aftHrp, S.cd],
-    assumptions: [ASSUMPTIONS.hrpPractice],
+    sources,
+    assumptions,
   };
 }
 
@@ -723,16 +785,77 @@ function explainSessions(input: {
 
   const maintained = (Object.keys(roles) as AftEventCode[]).filter((e) => roles[e] === "maintain");
   if (maintained.length) {
+    // Name only the work that is actually in the schedule for each maintained event.
+    const covered: AftEventCode[] = [];
     const where: string[] = [];
-    if (maintained.some((e) => e === "MDL" || e === "HRP" || e === "PLK")) where.push("shorter maintenance blocks in strength sessions");
-    if (maintained.includes("2MR")) where.push(count("endurance") ? "an easier aerobic session" : "aerobic work in other sessions");
-    if (maintained.includes("SDC") && (count("speed") || count("conditioning"))) where.push("the weekly speed or conditioning session");
+    const strengthKept = maintained.filter((e) => (e === "MDL" || e === "HRP" || e === "PLK") && count("strength") > 0);
+    if (strengthKept.length) {
+      covered.push(...strengthKept);
+      where.push("shorter maintenance blocks in strength sessions");
+    }
+    if (maintained.includes("2MR") && count("endurance")) {
+      covered.push("2MR");
+      where.push("an easier aerobic session");
+    }
+    if (maintained.includes("SDC") && (count("speed") || count("conditioning"))) {
+      covered.push("SDC");
+      where.push("the weekly speed or conditioning session");
+    }
     const joinList = (items: string[]) => (items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
-    lines.push(`Stronger events (${maintained.map((e) => aftEventInfo[e].shortName).join(", ")}) keep ${joinList(where) || "maintenance work"}.`);
+    if (covered.length) lines.push(`Stronger events (${covered.map((e) => aftEventInfo[e].shortName).join(", ")}) keep ${joinList(where)}.`);
+    const uncovered = maintained.filter((e) => !covered.includes(e));
+    if (uncovered.length) {
+      lines.push(
+        `${uncovered.map((e) => aftEventInfo[e].shortName).join(" and ")} ${uncovered.length > 1 ? "have" : "has"} no separate session with ${days} training days; choosing more days would add one.`
+      );
+    }
   }
   if (ctx.prefs.experience === "new" && (count("speed") > 0)) lines.push("Because you're new or returning to training, sprint intervals start with fewer repeats.");
   if (ctx.prefs.sessionMinutes === 30) lines.push("30-minute sessions use the Army's condensed Preparation Drill so more time goes to the main work.");
   return lines;
+}
+
+// ---------------------------------------------------------------------------
+// Timeline to the next AFT
+// ---------------------------------------------------------------------------
+
+export function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+export function describeTimeAvailable(days: number): string {
+  if (days <= 0) return days === 0 ? "on the plan's first day" : "before the plan starts";
+  const weeks = Math.floor(days / 7);
+  const rest = days % 7;
+  return `${plural(days, "day")} after the plan starts${weeks ? ` (${plural(weeks, "week")}${rest ? `, ${plural(rest, "day")}` : ""})` : ""}`;
+}
+
+// The plan is never shortened, stretched, or intensified to fit the date; the timeline only explains the fit.
+export function buildTimeline(nextAftDate: string, startDate: string, sessions: PlanSession[]): Timeline {
+  const planEndDate = addDays(startDate, PLAN_WEEKS * 7 - 1);
+  const daysUntilAft = daysBetween(startDate, nextAftDate);
+  const dates = sessions.map((s) => defaultSessionDate(startDate, s.week, s.weekday));
+  const sessionsBeforeAft = dates.filter((d) => d < nextAftDate).length;
+  const sessionsOnAftDay = dates.filter((d) => d === nextAftDate).length;
+  const fitsBeforeAft = nextAftDate > planEndDate;
+  const summary: string[] = [`Your AFT is ${describeTimeAvailable(daysUntilAft)}.`];
+  if (fitsBeforeAft) {
+    const gap = daysBetween(planEndDate, nextAftDate);
+    summary.push(
+      `The ${PLAN_WEEKS}-week plan, the only length RuckOn offers, ends ${plural(gap, "day")} before your AFT. RuckOn doesn't stretch it to fill the time; after week ${PLAN_WEEKS}, reassess and create a new plan from that result.`
+    );
+  } else {
+    summary.push(
+      `The only plan length RuckOn offers is ${PLAN_WEEKS} weeks, so this plan can't finish before your AFT. RuckOn doesn't shorten it or add workload to fit: ${sessionsBeforeAft} of ${sessions.length} sessions fall before your AFT, and the rest stay scheduled for afterward.`
+    );
+    if (sessionsOnAftDay) summary.push(`${plural(sessionsOnAftDay, "session")} falls on your AFT day. Skip it or move it to another day that week.`);
+  }
+  summary.push(
+    "The Army schedules testing after recovery or a taper (ATP 7-22.02 para 1-24). RuckOn's taper guidance hasn't been reviewed, so the plan doesn't change any session before the test. Ask your unit's H2F team how to prepare in the last days."
+  );
+  return { nextAftDate, daysUntilAft, planWeeks: PLAN_WEEKS, planEndDate, fitsBeforeAft, sessionsBeforeAft, sessionsOnAftDay, summary };
 }
 
 // ---------------------------------------------------------------------------
@@ -788,10 +911,13 @@ export function generatePlan(input: {
   };
 
   const develop = analysis.filter((a) => a.role === "develop").map((a) => a.event);
-  if (develop.length > 0 && develop.every((e) => e === "HRP") && restrictions.has("no-weight-on-hands")) {
+  const canPress = !restrictions.has("no-loaded-lifting") && prefs.equipment.length > 0;
+  if (develop.length > 0 && develop.every((e) => e === "HRP") && restrictions.has("no-weight-on-hands") && !canPress) {
     return {
       status: "not-possible",
-      reasons: ["Your development focus is the hand-release push-up, and you asked to avoid weight on your hands. The library has no substitute; ask your provider or H2F team."],
+      reasons: [
+        "Your development focus is the hand-release push-up, and you asked to avoid weight on your hands. Without equipment for a lying press (and with no lifting restriction), the library has no substitute; ask your provider or H2F team.",
+      ],
     };
   }
 
@@ -840,7 +966,7 @@ export function generatePlan(input: {
   }
 
   const sessions: PlanSession[] = [];
-  for (let week = 1; week <= 4; week++) {
+  for (let week = 1; week <= PLAN_WEEKS; week++) {
     days.forEach((weekday, i) => {
       const body = bodies[i];
       const all = [...body.warmUp, ...body.main, ...body.recovery];
@@ -879,17 +1005,11 @@ export function generatePlan(input: {
     );
   }
 
-  let reassessment =
-    "In week 5, record a practice AFT with a trained grader and create a new plan from that result. Army program design relies on follow-up assessments.";
-  if (prefs.nextAftDate) {
-    const planEnd = addDays(startDate, 27);
-    if (prefs.nextAftDate <= planEnd) {
-      const week = Math.floor((Date.parse(prefs.nextAftDate) - Date.parse(startDate)) / (7 * 86400000)) + 1;
-      reassessment = `Your AFT on ${prefs.nextAftDate} falls in week ${week}. Keep the one or two days before it light or restful (the Army tests after recovery or a taper), and create a new plan from your new result afterward.`;
-    } else {
-      reassessment = `The plan ends before your AFT on ${prefs.nextAftDate}. In week 5, record a practice AFT with a trained grader and create a new plan from that result.`;
-    }
-  }
+  const timeline = prefs.nextAftDate ? buildTimeline(prefs.nextAftDate, startDate, sessions) : undefined;
+  if (timeline) ctx.assumptions.add(ASSUMPTIONS.timeline);
+  const reassessment = timeline?.fitsBeforeAft === false
+    ? "Your AFT falls inside the plan. Afterward, link your AFT result to this plan to compare it with the baseline, then create a new plan from it."
+    : "After week 4, record a practice AFT with a trained grader and link it to this plan to compare it with the baseline. Then create a new plan from that result. Army program design relies on follow-up assessments.";
 
   const rationale = explainSessions({ kinds, priorities, roles, ctx, runMinutes, speedPossible });
 
@@ -905,6 +1025,7 @@ export function generatePlan(input: {
     scheduleNotes: notes,
     assumptions: Array.from(ctx.assumptions),
     reassessment,
+    ...(timeline ? { timeline } : {}),
     weeklyRunningMinutes,
     sessions,
   };

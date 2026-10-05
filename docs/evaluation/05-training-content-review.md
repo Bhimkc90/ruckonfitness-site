@@ -15,7 +15,8 @@ own assumptions.
 
 ## Decisions pending
 
-The full list, with the current rule and the question for each, is in `docs/training-plan-review.md`.
+The full list, with the current rule and the question for each, is in `docs/training-plan-review.md`. The
+exact prescriptions to sign off are in `docs/training-review/review-package.md`, generated from the engine.
 In short:
 
 1. How events are prioritized and how sessions are allocated across the week.
@@ -50,7 +51,7 @@ Date:
 Reviewer name:
 Role and qualifications:
 Organization (if reviewing in an official capacity, and whether they are authorized to):
-Content reviewed: (template version, e.g. starter-4wk-v2-draft; AFT guide; library; scoring interpretations)
+Content reviewed: (template version, e.g. starter-4wk-v3-draft; AFT guide; library; scoring interpretations)
 Commit reviewed:
 
 Item | Decision (approve / change / reject) | Required change | Rationale or source

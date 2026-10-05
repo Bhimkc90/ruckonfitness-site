@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { addDays, defaultSessionDate, weekWindow } from "@/lib/training/engine";
-import type { Difficulty, PlanDraft, SessionCompletion, StoredPlan } from "@/lib/training/types";
+import type { BaselineSnapshot, Difficulty, PlanDraft, SessionCompletion, StoredPlan } from "@/lib/training/types";
 
 // Training plans live in their own key, separate from AFT history, and only in this browser.
 export const TRAINING_KEY = "ruckon.trainingPlans";
@@ -94,13 +94,42 @@ export function rescheduleSession(
   const clash = others.find((o) => o.date === date);
   if (clash) return { data, error: `${clash.session.title} is already on that date. Choose another day.` };
   let warning: string | undefined;
-  if (HARD_KINDS.has(session.kind)) {
+  if (plan.preferences.nextAftDate === date) warning = "That's your AFT day. RuckOn doesn't schedule training on the test day; consider another day.";
+  else if (HARD_KINDS.has(session.kind)) {
     const neighbor = others.find((o) => HARD_KINDS.has(o.session.kind) && (o.date === addDays(date, 1) || o.date === addDays(date, -1)));
     if (neighbor) warning = `This puts ${session.title} next to ${neighbor.session.title}, another hard session. The plan avoids back-to-back hard days; consider a different day.`;
   }
   return {
     data: { ...data, plans: data.plans.map((p) => (p.id === planId ? { ...p, reschedules: { ...p.reschedules, [sessionId]: date } } : p)) },
     warning,
+  };
+}
+
+// Links a later saved AFT result to a plan as its reassessment, as a copy, so the comparison with the baseline
+// survives edits or deletion in AFT history. Replaces any earlier link; the plan itself is unchanged.
+export function linkReassessment(
+  data: TrainingData,
+  planId: string,
+  record: BaselineSnapshot,
+  linkedAt: string
+): { data: TrainingData; error?: string } {
+  const plan = data.plans.find((p) => p.id === planId);
+  if (!plan) return { data, error: "Plan not found." };
+  if (record.resultId === plan.baseline.resultId) return { data, error: "Choose a test other than the plan's baseline." };
+  if (record.testDate < plan.startDate) return { data, error: "Choose a test taken on or after the plan's start date." };
+  const link = { ...(JSON.parse(JSON.stringify(record)) as BaselineSnapshot), linkedAt };
+  return { data: { ...data, plans: data.plans.map((p) => (p.id === planId ? { ...p, reassessmentLink: link } : p)) } };
+}
+
+export function unlinkReassessment(data: TrainingData, planId: string): TrainingData {
+  return {
+    ...data,
+    plans: data.plans.map((p) => {
+      if (p.id !== planId) return p;
+      const { reassessmentLink: _removed, ...rest } = p;
+      void _removed;
+      return rest;
+    }),
   };
 }
 

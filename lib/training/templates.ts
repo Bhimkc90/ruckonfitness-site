@@ -1,7 +1,7 @@
 import type { ActivityId, RunningVolume } from "./types";
 
 // Version stored with every plan so later template changes never silently rewrite an active plan.
-export const TEMPLATE_VERSION = "starter-4wk-v2-draft (2026-09-30, not professionally reviewed)";
+export const TEMPLATE_VERSION = "starter-4wk-v3-draft (2026-10-05, not professionally reviewed)";
 
 // Citations used by the templates. Page numbers are the printed page numbers.
 export const S = {
@@ -30,6 +30,10 @@ export const S = {
   progression: "FM 7-22 para 7-3, p. 7-1: progression overloads the body without causing overtraining",
   design:
     "FM 7-22 p. 6-8: program design is completed by H2F performance readiness experts; individualization and follow-up assessments drive the training cycle",
+  stcChestPress: "ATP 7-22.02 para 13-9, p. 13-7: Supine Chest Press, Strength Training Circuit station 6, one minute",
+  fwBench: "ATP 7-22.02 para 14-10, pp. 14-6 – 14-8: Bench Press, a Free Weight Training core exercise",
+  pushSubstitute: "ATP 7-22.02 para 13-9, p. 13-7: the Supine Chest Press presses while lying on the back, so the trunk does not hold a plank",
+  taper: "ATP 7-22.02 para 1-24, p. 1-9: the Army schedules testing after recovery or a taper",
   aftHrp: "ATP 7-22.01 (12 Mar 2026) paras 2-57 – 2-60, pp. 30–31: HRP standards",
   aftPlk: "ATP 7-22.01 (12 Mar 2026) para 2-73, p. 35: plank standards",
 } as const;
@@ -46,6 +50,8 @@ export const ASSUMPTIONS = {
   kettlebellCircuit: "Kettlebell stations: 2 rounds (weeks 1–2), then 3 rounds (weeks 3–4) of 1-minute stations with 60 seconds between rounds.",
   hrpPractice:
     "HRP practice: 3 sets (weeks 1–2), then 4 sets (weeks 3–4) of about half your baseline repetitions (5–25), 60–90 seconds' rest, stopping a set when a rep breaks standard.",
+  pushAccessory:
+    "Push accessory: with equipment and no lifting restriction, push-up development adds a loaded press: the Supine Chest Press station with kettlebells (2 rounds, then 3, of 1 minute) or the Bench Press with a barbell or dumbbells (2 sets, then 3, of 8–10 reps at RPE 6–7, 90 seconds' rest). If you avoid weight on your hands, the same press replaces push-up practice; it does not train the event itself.",
   plankPractice: "Plank practice: 2 holds (weeks 1–2), then 3 holds (weeks 3–4) of about half your baseline time (20 seconds to 2:00), 60 seconds' rest.",
   runningCap:
     "Running: each run is capped by your reported recent running (10, 20, 25, or 30 minutes) and weekly running never exceeds the top of your reported range. Running time does not increase during the plan.",
@@ -57,7 +63,10 @@ export const ASSUMPTIONS = {
     "Weeks 3–4 add sets, repeats, or drill repetitions only if no earlier session was rated too hard and no pain was reported; otherwise the weeks 1–2 level repeats.",
   scheduling:
     "Strength, speed, and conditioning sessions count as hard and are never scheduled on back-to-back days; a hard session becomes a recovery session when your chosen days make that impossible.",
-  reassessment: "Reassess with a practice AFT in week 5, or keep the one or two days before a scheduled AFT light.",
+  reassessment:
+    "Reassessment: record a practice AFT with a trained grader after the plan (week 5) and link it to the plan to compare with the baseline. RuckOn does not change any session for a taper before a scheduled AFT.",
+  timeline:
+    "Timeline: the only template is 4 weeks. If your AFT is sooner, the plan is not shortened and no workload is added; sessions on or after the AFT date stay scheduled for afterward.",
   screening:
     "Screening: current pain pauses plan creation; written instructions or profile details RuckOn cannot interpret send you to a review path instead of a plan.",
 } as const;
@@ -93,6 +102,11 @@ export const activities: Record<ActivityId, { name: string; description: string;
     link: "/aft-guide/plank",
   },
 };
+
+// Plan lengths the templates support, in weeks. Only the 4-week starter template exists; any other length
+// needs its own reviewed template rather than a compressed or stretched version of this one.
+export const SUPPORTED_PLAN_WEEKS = [4] as const;
+export const PLAN_WEEKS = 4;
 
 // Longest single run and most weekly running minutes for each self-reported range.
 export const runningLimits: Record<RunningVolume, { perRun: number; perWeek: number }> = {

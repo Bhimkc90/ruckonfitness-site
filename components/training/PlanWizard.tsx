@@ -11,7 +11,8 @@ import { useAftResults, useHydrated } from "@/lib/storage/aftResults";
 import { useProfile } from "@/lib/storage/profile";
 import { planPrefill } from "@/lib/profile/profile";
 import { activePlan, startPlan, updateTrainingData, useTrainingData } from "@/lib/storage/trainingPlans";
-import { WEEKDAYS, generatePlan, weekdayLabels } from "@/lib/training/engine";
+import { WEEKDAYS, addDays, daysBetween, describeTimeAvailable, generatePlan, weekdayLabels } from "@/lib/training/engine";
+import { PLAN_WEEKS } from "@/lib/training/templates";
 import type {
   DaysPerWeek,
   PlanOutcome,
@@ -223,6 +224,9 @@ export default function PlanWizard() {
               . Check each one before continuing. Changes here apply to this plan only and don&apos;t change your profile.
             </p>
           )}
+          <p className="mb-4 text-xs text-ink-2">
+            Plan length: {PLAN_WEEKS} weeks. This is the only template RuckOn offers; it isn&apos;t shortened or stretched to fit a test date.
+          </p>
           <div className="grid gap-5 md:grid-cols-2">
             <label className="block text-sm">
               <span className="text-ink-2">Training days per week</span>
@@ -357,6 +361,17 @@ export default function PlanWizard() {
             <label className="block text-sm">
               <span className="text-ink-2">Next AFT date (optional)</span>
               <input type="date" value={aftDate} onChange={(e) => setAftDate(e.target.value)} className={inputClass} />
+              {aftDate && /^\d{4}-\d{2}-\d{2}$/.test(aftDate) && (
+                <span className="mt-1 block text-xs text-ink">
+                  {daysBetween(start, aftDate) < 0
+                    ? "This date is before the plan would start."
+                    : `Time available: your AFT is ${describeTimeAvailable(daysBetween(start, aftDate))} (start ${formatTestDate(start, "short")}). ${
+                        aftDate > addDays(start, PLAN_WEEKS * 7 - 1)
+                          ? `The ${PLAN_WEEKS}-week plan fits before it.`
+                          : `The ${PLAN_WEEKS}-week plan can't finish before it, and RuckOn won't shorten it. The review step shows what that means.`
+                      }`}
+                </span>
+              )}
             </label>
             <label className="block text-sm">
               <span className="text-ink-2">Target total score (optional)</span>

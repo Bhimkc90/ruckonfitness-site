@@ -101,6 +101,18 @@ export type PlanSession = {
   recovery: PlanBlock[];
 };
 
+// How the plan fits the time before a scheduled AFT. Computed when the plan is generated and stored with it.
+export type Timeline = {
+  nextAftDate: string;
+  daysUntilAft: number; // from the plan start date
+  planWeeks: number;
+  planEndDate: string;
+  fitsBeforeAft: boolean;
+  sessionsBeforeAft: number;
+  sessionsOnAftDay: number;
+  summary: string[];
+};
+
 export type PlanDraft = {
   templateVersion: string;
   baseline: BaselineSnapshot;
@@ -115,6 +127,7 @@ export type PlanDraft = {
   scheduleNotes: string[];
   assumptions: string[];
   reassessment: string;
+  timeline?: Timeline;
   weeklyRunningMinutes: number;
   sessions: PlanSession[];
 };
@@ -137,6 +150,9 @@ export type SessionCompletion = {
   notes: string;
 };
 
+// A later AFT result linked to the plan as its reassessment. A copy, like the baseline, so it survives edits.
+export type ReassessmentLink = BaselineSnapshot & { linkedAt: string };
+
 export type StoredPlan = PlanDraft & {
   id: string;
   createdAt: string;
@@ -144,4 +160,5 @@ export type StoredPlan = PlanDraft & {
   status: "active" | "ended";
   // Session id -> YYYY-MM-DD; overrides the default date for rescheduled sessions.
   reschedules: Record<string, string>;
+  reassessmentLink?: ReassessmentLink;
 };

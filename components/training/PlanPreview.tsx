@@ -4,7 +4,8 @@ import { Info } from "lucide-react";
 import { aftEventInfo } from "@/lib/aft/scoring";
 import { formatRaw, formatTestDate } from "@/lib/aft/format";
 import { defaultSessionDate, weekdayLabels, SOURCES_FOR_PLAN } from "@/lib/training/engine";
-import type { PlanDraft, PlanSession } from "@/lib/training/types";
+import type { EquipmentOption, PlanDraft, PlanSession, Restriction } from "@/lib/training/types";
+import { PLAN_WEEKS } from "@/lib/training/templates";
 import { Card } from "@/components/ui/Card";
 import { Chip, PassFailBadge } from "@/components/ui/StatusBadge";
 import { BlockView } from "./PlanParts";
@@ -97,6 +98,7 @@ export function NotesCard({ plan }: { plan: PlanDraft }) {
           </ul>
         </>
       )}
+      {plan.timeline && <TimelineNote plan={plan} />}
       <h3 className="mt-4 text-sm font-semibold text-ink">Reassessment</h3>
       <p className="mt-1 text-sm text-ink">{plan.reassessment}</p>
       <p className="mt-3 text-xs text-ink-2">Planned running: about {plan.weeklyRunningMinutes} minutes a week.</p>
@@ -121,7 +123,31 @@ export function NotesCard({ plan }: { plan: PlanDraft }) {
   );
 }
 
-export function SessionBody({ session, useBuild }: { session: PlanSession; useBuild: boolean }) {
+export function TimelineNote({ plan }: { plan: PlanDraft }) {
+  const t = plan.timeline!;
+  return (
+    <div className={`mt-4 rounded-lg border p-3 ${t.fitsBeforeAft ? "border-line" : "border-warn/60 bg-accent/10"}`}>
+      <h3 className="text-sm font-semibold text-ink">Time until your AFT ({formatTestDate(t.nextAftDate)})</h3>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink">
+        {t.summary.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function SessionBody({
+  session,
+  useBuild,
+  restrictions,
+  equipment,
+}: {
+  session: PlanSession;
+  useBuild: boolean;
+  restrictions?: Restriction[];
+  equipment?: EquipmentOption[];
+}) {
   const sections: [string, typeof session.warmUp][] = [
     ["Warm-up", session.warmUp],
     ["Main workout", session.main],
@@ -135,7 +161,7 @@ export function SessionBody({ session, useBuild }: { session: PlanSession; useBu
           <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-2">{label}</h4>
           <ul className="mt-1.5 space-y-2">
             {blocks.map((block) => (
-              <BlockView key={block.id} block={block} useBuild={useBuild} condensed={block.id === "pd-condensed"} />
+              <BlockView key={block.id} block={block} useBuild={useBuild} condensed={block.id === "pd-condensed"} restrictions={restrictions} equipment={equipment} />
             ))}
           </ul>
         </div>
@@ -153,7 +179,7 @@ export default function PlanPreview({ plan, startDate }: { plan: PlanDraft; star
       </div>
       <Card title="Four-week schedule" description="Weeks 1–2 build the foundation; weeks 3–4 add a little volume if the earlier weeks went well.">
         <div className="space-y-4">
-          {[1, 2, 3, 4].map((week) => (
+          {Array.from({ length: PLAN_WEEKS }, (_, i) => i + 1).map((week) => (
             <details key={week} open={week === 1} className="rounded-lg border border-line p-3">
               <summary className="cursor-pointer text-sm font-semibold text-ink">
                 Week {week} <span className="font-normal text-ink-2">· {week <= 2 ? "Foundation" : "Build"}</span>
@@ -172,7 +198,7 @@ export default function PlanPreview({ plan, startDate }: { plan: PlanDraft; star
                           <Chip>about {session.estimatedMinutes} min</Chip>
                         </summary>
                         <div className="mt-3">
-                          <SessionBody session={session} useBuild={week >= 3} />
+                          <SessionBody session={session} useBuild={week >= 3} restrictions={plan.preferences.restrictions} equipment={plan.preferences.equipment} />
                         </div>
                       </details>
                     </li>

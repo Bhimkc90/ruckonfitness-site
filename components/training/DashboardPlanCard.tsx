@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { formatTestDate } from "@/lib/aft/format";
 import { activePlan, useTrainingData } from "@/lib/storage/trainingPlans";
-import { adherence, currentWeek, nextSession } from "@/lib/training/progress";
+import { adherence, compareWithBaseline, currentWeek, nextSession } from "@/lib/training/progress";
+import { formatSignedPoints } from "@/lib/aft/format";
+import { PLAN_WEEKS } from "@/lib/training/templates";
 import { Card } from "@/components/ui/Card";
 import { ButtonLink } from "@/components/ui/Button";
 import { useToday } from "./PlanParts";
@@ -30,7 +32,7 @@ export default function DashboardPlanCard({ latestResultId }: { latestResultId: 
   return (
     <Card
       title="Training plan"
-      description={`Baseline from ${formatTestDate(plan.baseline.testDate)} · ${week <= 4 ? `week ${week} of 4` : "plan finished"}`}
+      description={`Baseline from ${formatTestDate(plan.baseline.testDate)} · ${week <= PLAN_WEEKS ? `week ${week} of ${PLAN_WEEKS}` : "plan finished"}`}
       action={
         <Link href="/training-plan" className="text-sm font-medium text-accent-ink hover:underline">
           Open plan
@@ -64,6 +66,26 @@ export default function DashboardPlanCard({ latestResultId }: { latestResultId: 
           </dd>
         </div>
       </dl>
+      {plan.reassessmentLink ? (
+        <p className="mt-4 text-sm text-ink">
+          Reassessment linked: {formatTestDate(plan.reassessmentLink.testDate)}
+          {(() => {
+            const cmp = compareWithBaseline(plan.baseline, plan.reassessmentLink!);
+            return cmp.totalChange !== null ? `, total ${formatSignedPoints(cmp.totalChange)} vs baseline` : " (different scoring category, so points aren't compared)";
+          })()}
+          .
+        </p>
+      ) : (
+        week > PLAN_WEEKS && (
+          <p className="mt-4 text-sm text-ink">
+            Plan finished. Record a practice AFT and{" "}
+            <Link href="/training-plan" className="font-semibold text-accent-ink underline">
+              link it as your reassessment
+            </Link>
+            .
+          </p>
+        )
+      )}
     </Card>
   );
 }

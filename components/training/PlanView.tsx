@@ -1,24 +1,40 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardPlus, Info, RotateCcw } from "lucide-react";
-import { formatInstantDate, formatTestDate } from "@/lib/aft/format";
-import { useAftResults, useHydrated } from "@/lib/storage/aftResults";
+import Link from "next/link";
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, ClipboardPlus, Info, Link2, Minus, RotateCcw } from "lucide-react";
+import { aftEventInfo } from "@/lib/aft/scoring";
+import { describeCategory, formatInstantDate, formatRaw, formatSignedPoints, formatTestDate } from "@/lib/aft/format";
+import { categoryOf } from "@/lib/aft/progress";
+import { useAftResults, useHydrated, type SavedAftResult } from "@/lib/storage/aftResults";
 import {
   activePlan,
   completeSession,
   endPlan,
+  linkReassessment,
   rescheduleSession,
   undoCompletion,
+  unlinkReassessment,
   updateTrainingData,
   useTrainingData,
 } from "@/lib/storage/trainingPlans";
 import { weekWindow, weekdayLabels, weekdayOf } from "@/lib/training/engine";
-import { adherence, currentWeek, nextSession, painReported, planCompletions, progressionHeld, sessionsByDate } from "@/lib/training/progress";
+import {
+  adherence,
+  compareWithBaseline,
+  currentWeek,
+  nextSession,
+  painReported,
+  planCompletions,
+  progressionHeld,
+  reassessmentCandidates,
+  sessionsByDate,
+} from "@/lib/training/progress";
+import { PLAN_WEEKS } from "@/lib/training/templates";
 import type { Difficulty, PlanSession, SessionCompletion, StoredPlan } from "@/lib/training/types";
 import { Card, PageHeader } from "@/components/ui/Card";
 import { ButtonLink, buttonClass } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/StatusBadge";
+import { Chip, PassFailBadge } from "@/components/ui/StatusBadge";
 import { PlanDisclaimer, useToday } from "./PlanParts";
 import { FocusCard, NotesCard, SessionBody } from "./PlanPreview";
 import { inputClass } from "@/components/ui/form";
@@ -57,14 +73,20 @@ export default function PlanView() {
           </ButtonLink>
           {ended > 0 && <p className="mt-4 text-xs text-ink-2">{ended} earlier plan{ended > 1 ? "s are" : " is"} kept in this browser.</p>}
         </Card>
+        <EarlierPlans plans={data.plans.filter((p) => p.status === "ended")} completions={data.completions} />
       </div>
     );
   }
 
-  return <ActivePlan plan={plan} completions={data.completions} today={today} />;
+  return (
+    <div className="space-y-5">
+      <ActivePlan plan={plan} completions={data.completions} today={today} results={results} />
+      <EarlierPlans plans={data.plans.filter((p) => p.status === "ended")} completions={data.completions} />
+    </div>
+  );
 }
 
-function ActivePlan({ plan, completions, today }: { plan: StoredPlan; completions: SessionCompletion[]; today: string }) {
+function ActivePlan({ plan, completions, today, results }: { plan: StoredPlan; completions: SessionCompletion[]; today: string; results: SavedAftResult[] }) {
   const [message, setMessage] = useState("");
   const done = planCompletions(plan, completions);
   const stats = adherence(plan, completions, today);
@@ -78,7 +100,7 @@ function ActivePlan({ plan, completions, today }: { plan: StoredPlan; completion
     <div className="space-y-5">
       <PageHeader
         title="Training plan"
-        description={`Four-week starter plan from ${formatTestDate(plan.startDate)} · ${week <= 4 ? `week ${week} of 4` : "finished"}`}
+        description={`Four-week starter plan from ${formatTestDate(plan.startDate)} · ${week <= PLAN_WEEKS ? `week ${week} of ${PLAN_WEEKS}` : "finished"}`}
         actions={
           <>
             <ButtonLink href="/training-plan/new" variant="secondary">
@@ -154,7 +176,14 @@ function ActivePlan({ plan, completions, today }: { plan: StoredPlan; completion
         </p>
       )}
 
-      {[1, 2, 3, 4].map((w) => {
+      {week > PLAN_WEEKS && !plan.reassessmentLink && (
+        <p role="status" className="flex gap-2 rounded-lg border border-accent bg-accent/10 p-3 text-sm text-ink">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          The four weeks are over. Record a practice AFT, then link it below to compare it with your baseline.
+        </p>
+      )}
+
+      {Array.from({ length: PLAN_WEEKS }, (_, i) => i + 1).map((w) => {
         const held = progressionHeld(plan, completions, w);
         const range = weekWindow(plan.startDate, w);
         return (
@@ -186,6 +215,7 @@ function ActivePlan({ plan, completions, today }: { plan: StoredPlan; completion
                     completion={done.get(session.id)}
                     useBuild={w >= 3 && !held}
                     afterAft={!!aftDate && date > aftDate}
+                    onAftDay={aftDate === date}
                     onError={setMessage}
                   />
                 ))}
@@ -194,11 +224,185 @@ function ActivePlan({ plan, completions, today }: { plan: StoredPlan; completion
         );
       })}
 
+      <ReassessmentCard plan={plan} results={results} />
+
       <div className="grid gap-5 lg:grid-cols-2 [&>*]:min-w-0">
         <FocusCard plan={plan} />
         <NotesCard plan={plan} />
       </div>
     </div>
+  );
+}
+
+function ChangeMark({ value }: { value: number | null }) {
+  if (value === null) return <span className="text-ink-2">—</span>;
+  const Icon = value > 0 ? ArrowUpRight : value < 0 ? ArrowDownRight : Minus;
+  const tone = value > 0 ? "text-good" : value < 0 ? "text-bad" : "text-ink-2";
+  return (
+    <span className={`inline-flex items-center gap-0.5 font-semibold ${tone}`}>
+      <Icon className="h-3.5 w-3.5" aria-hidden />
+      {formatSignedPoints(value)}
+    </span>
+  );
+}
+
+// Links a later AFT result to the plan and compares it with the plan's own baseline copy.
+function ReassessmentCard({ plan, results }: { plan: StoredPlan; results: SavedAftResult[] }) {
+  const candidates = reassessmentCandidates(plan, results);
+  const [chosen, setChosen] = useState("");
+  const [error, setError] = useState("");
+  const link = plan.reassessmentLink;
+  const selected = chosen || candidates[0]?.id || "";
+
+  const doLink = () => {
+    const record = candidates.find((r) => r.id === selected);
+    if (!record) return;
+    let problem: string | undefined;
+    const saved = updateTrainingData((d) => {
+      const out = linkReassessment(d, plan.id, { resultId: record.id, testDate: record.testDate, input: record.input, result: record.result }, new Date().toISOString());
+      problem = out.error;
+      return out.data;
+    });
+    setError(problem ?? (saved.ok ? "" : saved.error));
+  };
+
+  return (
+    <Card
+      title="Reassessment"
+      description={`Compared with this plan's baseline from ${formatTestDate(plan.baseline.testDate)}. Changes are what you recorded; RuckOn doesn't attribute them to the plan.`}
+    >
+      {link ? (
+        <ReassessmentComparison plan={plan} />
+      ) : candidates.length > 0 ? (
+        <div className="flex flex-wrap items-end gap-3 text-sm">
+          <label className="block">
+            <span className="text-xs text-ink-2">AFT taken on or after {formatTestDate(plan.startDate)}</span>
+            <select value={selected} onChange={(e) => setChosen(e.target.value)} className={inputClass}>
+              {candidates.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {formatTestDate(r.testDate)} · {r.result.total} points · {describeCategory(categoryOf(r.result))}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" onClick={doLink} className={buttonClass("secondary")}>
+            <Link2 className="h-4 w-4" aria-hidden />
+            Link as reassessment
+          </button>
+        </div>
+      ) : (
+        <p className="text-sm text-ink">
+          No saved AFT taken since the plan started.{" "}
+          <Link href="/aft-calculator" className="font-semibold text-accent-ink underline">
+            Record your practice AFT
+          </Link>{" "}
+          after week {PLAN_WEEKS}, then link it here.
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-bad">
+          {error}
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function ReassessmentComparison({ plan, compact = false }: { plan: StoredPlan; compact?: boolean }) {
+  const link = plan.reassessmentLink!;
+  const cmp = compareWithBaseline(plan.baseline, link);
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <span>
+          Baseline {formatTestDate(plan.baseline.testDate)}: <span className="font-semibold">{plan.baseline.result.total}</span>{" "}
+          <PassFailBadge passed={plan.baseline.result.passed} />
+        </span>
+        <span>
+          Reassessment {formatTestDate(link.testDate)}: <span className="font-semibold">{link.result.total}</span> <PassFailBadge passed={link.result.passed} />
+        </span>
+        {cmp.comparable && (
+          <span>
+            Total <ChangeMark value={cmp.totalChange} />
+          </span>
+        )}
+      </div>
+      {!cmp.comparable && (
+        <p className="flex gap-1.5 text-xs text-ink-2">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          {cmp.categoryChanges.join(". ")}. Points aren&apos;t compared across scoring categories; raw results still are.
+        </p>
+      )}
+      {!compact && (
+        <div className="relative overflow-x-auto">
+          <table className="w-full min-w-[440px] text-left text-sm">
+            <thead className="text-xs text-ink-2">
+              <tr>
+                <th className="py-1.5 pr-3 font-medium">Event</th>
+                <th className="py-1.5 pr-3 text-right font-medium">Baseline</th>
+                <th className="py-1.5 pr-3 text-right font-medium">Reassessment</th>
+                <th className="py-1.5 pr-3 font-medium">Change</th>
+                <th className="py-1.5 text-right font-medium">Points</th>
+              </tr>
+            </thead>
+            <tbody className="tabular-nums">
+              {cmp.events.map((e) => {
+                const before = plan.baseline.result.events.find((x) => x.event === e.event)!;
+                const after = link.result.events.find((x) => x.event === e.event)!;
+                return (
+                  <tr key={e.event} className="border-t border-line">
+                    <td className="py-2 pr-3 text-ink">{aftEventInfo[e.event].name}</td>
+                    <td className="py-2 pr-3 text-right text-ink-2">{formatRaw(e.event, before.raw)}</td>
+                    <td className="py-2 pr-3 text-right text-ink">{formatRaw(e.event, after.raw)}</td>
+                    <td className={`py-2 pr-3 ${e.improved === true ? "text-good" : e.improved === false ? "text-bad" : "text-ink-2"}`}>{e.rawText}</td>
+                    <td className="py-2 text-right">
+                      <ChangeMark value={e.pointsChange} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {!compact && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href={`/training-plan/new?baseline=${link.resultId}`} className={buttonClass("primary")}>
+            <ClipboardPlus className="h-4 w-4" aria-hidden />
+            Create the next plan from this result
+          </Link>
+          <button type="button" onClick={() => updateTrainingData((d) => unlinkReassessment(d, plan.id))} className={buttonClass("ghost")}>
+            Unlink
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EarlierPlans({ plans, completions }: { plans: StoredPlan[]; completions: SessionCompletion[] }) {
+  if (plans.length === 0) return null;
+  return (
+    <Card title="Earlier plans" description="Kept in this browser with their baselines, template versions, completions, and reassessments.">
+      <ul className="space-y-3">
+        {[...plans].reverse().map((p) => {
+          const recorded = completions.filter((c) => c.planId === p.id).length;
+          return (
+            <li key={p.id} className="rounded-lg border border-line p-3 text-sm">
+              <p className="font-medium text-ink">
+                Started {formatTestDate(p.startDate)} · baseline {formatTestDate(p.baseline.testDate)} ({p.baseline.result.total})
+              </p>
+              <p className="text-xs text-ink-2">
+                {recorded} of {p.sessions.length} sessions recorded · {p.templateVersion}
+              </p>
+              <div className="mt-2">
+                {p.reassessmentLink ? <ReassessmentComparison plan={p} compact /> : <p className="text-xs text-ink-2">No reassessment linked.</p>}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }
 
@@ -210,6 +414,7 @@ function SessionRow({
   completion,
   useBuild,
   afterAft,
+  onAftDay,
   onError,
 }: {
   plan: StoredPlan;
@@ -219,6 +424,7 @@ function SessionRow({
   completion?: SessionCompletion;
   useBuild: boolean;
   afterAft: boolean;
+  onAftDay: boolean;
   onError: (message: string) => void;
 }) {
   const [difficulty, setDifficulty] = useState<Difficulty | "">("");
@@ -256,7 +462,10 @@ function SessionRow({
             <span className="text-sm font-medium text-ink">
               {weekdayLabels[weekdayOf(date)]} {formatTestDate(date, "short")} · {session.title}
             </span>
-            <span className="block text-xs text-ink-2">about {session.estimatedMinutes} min{afterAft ? " · after your AFT date" : ""}</span>
+            <span className="block text-xs text-ink-2">
+              about {session.estimatedMinutes} min{afterAft ? " · after your AFT date" : ""}
+              {onAftDay && <span className="font-semibold text-warn"> · on your AFT day: skip it or move it</span>}
+            </span>
           </span>
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -269,7 +478,7 @@ function SessionRow({
         </summary>
 
         <div className="mt-3 space-y-4">
-          <SessionBody session={session} useBuild={useBuild} />
+          <SessionBody session={session} useBuild={useBuild} restrictions={plan.preferences.restrictions} equipment={plan.preferences.equipment} />
 
           {completion ? (
             <div className="rounded-lg border border-line p-3 text-sm">
@@ -314,9 +523,12 @@ function SessionRow({
                   className={inputClass}
                 />
               </label>
-              <button type="button" onClick={save} disabled={!difficulty} className={buttonClass("primary", "mt-3")}>
-                Mark complete
-              </button>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button type="button" onClick={save} disabled={!difficulty || date > today} className={buttonClass("primary")}>
+                  Mark complete
+                </button>
+                {date > today && <span className="text-xs text-ink-2">You can record this on or after {formatTestDate(date, "short")}, or move it to today.</span>}
+              </div>
             </div>
           )}
 

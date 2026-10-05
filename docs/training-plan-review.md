@@ -22,7 +22,13 @@ into a plan for any self-selected user are RuckOn assumptions. They need review 
 professional, such as an H2F strength and conditioning coach or athletic trainer, with physical therapy
 input for the screening items.
 
-Template version: `starter-4wk-v2-draft` (`lib/training/templates.ts`, `TEMPLATE_VERSION`).
+Template version: `starter-4wk-v3-draft` (`lib/training/templates.ts`, `TEMPLATE_VERSION`). Plans already saved
+keep the version and prescriptions they were created with.
+
+**Exact prescriptions for sign-off:** `docs/training-review/review-package.md`. It is generated from the engine by
+`lib/training/reviewPackage.ts`, and a test fails if it is out of date. It lists every block the engine produces
+across a scenario matrix, with weeks 1–2 and 3–4 prescriptions, sources, rules, and a decision box for each
+assumption.
 
 ## Items to review
 
@@ -42,13 +48,28 @@ Each item is in `ASSUMPTIONS` in `lib/training/templates.ts` and is shown to use
 | 8 | Time estimates | PD 10 min (condensed 5), RD 8, Four for the Core 7, MMD1 5, one round of CD1 + CD2 8. | Are the estimates realistic, so sessions fit the chosen length? |
 | 9 | Progression gate | Weeks 3–4 use the build level only if no earlier session was rated too hard and no pain was reported; otherwise weeks 1–2 repeat. Pain shows a stop-and-consult banner. | Is this gate sufficient? |
 | 10 | Scheduling | Strength, speed, and conditioning are hard; no two hard sessions on consecutive days; a hard session becomes recovery when the chosen days make that impossible. | Is the hard/easy classification right, especially for the easy run next to a hard day? |
-| 11 | Reassessment | Practice AFT in week 5, or keep 1–2 days before a scheduled AFT light (ATP 7-22.02 para 1-24 schedules tests after recovery or a taper). | Is the guidance appropriate? |
-| 12 | Screening | Current pain → no plan and a referral message. Any free-text instruction or profile detail → review path, no plan. Four movement restrictions (running, jumping, lifting weights, weight on hands) filter exercises by library tags. | Wording of the pain question and referral, and whether the restriction mapping (e.g. Vertical counted as jumping, Quadraplex and Extend and Flex as weight on hands) is correct. |
+| 11 | Reassessment and taper | After week 4, record a practice AFT and link it to the plan; it is compared with the plan's baseline copy (points only within the same scoring category). No session is changed before a scheduled AFT: ATP 7-22.02 para 1-24 schedules tests after recovery or a taper, but RuckOn's taper rule is unreviewed, so the plan cites the source and refers the user to their H2F team. | Is week-5 reassessment appropriate, and should a reviewed taper rule be added? |
+| 12 | Screening | Current pain → no plan and a referral message. Any free-text instruction or profile detail → review path, no plan. Four movement restrictions (running, jumping, lifting weights, weight on hands) filter exercises by library tags. Weight on hands removes bodyweight pushing and Front Leaning Rest or Six-Point Stance exercises; loaded presses stay available. | Wording of the pain question and referral, and whether the restriction mapping (e.g. Vertical counted as jumping, Quadraplex and Extend and Flex as weight on hands, lying presses allowed) is correct. |
+
+| 13 | Push accessory (new in v3) | Push-up development adds a loaded press when equipment allows and lifting isn't restricted: Supine Chest Press station with kettlebells (2, then 3 rounds of 1 minute; ATP 7-22.02 para 13-9) or Bench Press with a barbell or dumbbells (2, then 3 sets of 8–10 at RPE 6–7, 90 s rest, with a spotter; para 14-10, 14-12). With the weight-on-hands restriction the press replaces push-up practice, and the plan says it doesn't train the event. | Is a press appropriate for push-up development, and as a substitute when weight on the hands is restricted? |
+| 14 | Plan length and timeline (new in v3) | Only a 4-week template exists. The AFT date shows the time available. If the AFT is sooner than 4 weeks, the plan is not shortened and no workload is added; sessions on or after the AFT date stay scheduled for afterward, and a session on the AFT day is flagged. | Should other reviewed plan lengths exist (for example 2 or 6 weeks), and what should happen when a test is sooner? |
+
+## Status of the flow (5 Oct 2026)
+
+Working in the local preview: choose a baseline → health check → preferences prefilled from Profile, which must
+be confirmed → review (focus, rationale, limits, timeline, every session) → start → complete or undo sessions with
+difficulty, pain, and notes → reschedule within the week (completions kept) → dashboard next workout and recorded
+adherence → link a reassessment → create the next plan from it. Earlier plans keep their baselines, versions,
+completions, and reassessments.
+
+The "Explain my results" AI feature is separate and does not explain, generate, or alter plans. If AI explanations
+of plans are added after this review, they may only restate verified plan facts and must stay behind this flag.
 
 ## Sourced elements
 
 These come directly from Army publications and are cited in the app:
 
+- Supine Chest Press as a Strength Training Circuit station (ATP 7-22.02 para 13-9) and Bench Press with a spotter (paras 14-10, 14-12).
 - Preparation Drill at 10 repetitions and the condensed-time version (ATP 7-22.02 Table 1-1, p. 1-7).
 - Recovery Drill holds of 20–30 s (ATP 7-22.02 ch. 16).
 - Four for the Core holds (ATP 7-22.02 paras 4-14 – 4-18).
@@ -71,5 +92,6 @@ The plan uses the selected AFT result's raw results, points, scoring category, a
 ## To enable after review
 
 1. Update the templates and assumptions as the reviewer directs.
-2. Change `TEMPLATE_VERSION` and record the reviewer, date, and scope here.
+2. Change `TEMPLATE_VERSION`, regenerate the review package, and record the reviewer, date, and scope here, using
+   the record template in `docs/evaluation/05-training-content-review.md`.
 3. Set `NEXT_PUBLIC_TRAINING_PLANS=enabled` for the Vercel Production environment and redeploy.
