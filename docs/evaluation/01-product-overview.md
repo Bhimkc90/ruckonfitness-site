@@ -18,6 +18,9 @@ prepare for the Army Fitness Test (AFT). It is unofficial and not endorsed by th
 - No accounts, sign-in, server database, or sync. All data stays in the user's browser.
 - No unit, leader or roster views. It cannot be used to collect or report other Soldiers' scores.
 - It does not record official AFT results and does not replace the official scorecard or any Army system.
+- **AI explanations ("Explain my results") are off in production** (`NEXT_PUBLIC_AI_EXPLAIN` and `AI_EXPLAIN`).
+  When released, they explain a verified result in plain language. They never set scores, give workouts or
+  medical advice, or predict results. See `docs/ai-explanations.md`.
 - **Personalized training plans are off in production** (`NEXT_PUBLIC_TRAINING_PLANS` in `lib/features.ts`).
   The public page shows clearly labeled, unreviewed examples only. See document 5.
 - No medical, injury or profile advice.

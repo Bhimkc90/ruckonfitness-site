@@ -31,7 +31,27 @@ or a security certification.
 - **Malformed input:** empty, non-JSON, wrong type and deeply nested files are rejected without errors (tested).
 - **Links:** every new-tab link has `rel="noopener noreferrer"` or `noreferrer`.
 - **URLs and logs:** no personal data in URLs; the app writes no logs.
-- **Server attack surface:** no API routes, server actions, uploads to a server, or authentication.
+- **Server attack surface:** one API route, `POST /api/explain`, which returns 404 in production while AI explanations are off. No server actions, uploads to a server, or authentication.
+
+## AI explanations endpoint (added 5 Oct 2026, off in production)
+
+`POST /api/explain` is the app's first server endpoint and is closed unless `AI_EXPLAIN=enabled`. Controls:
+
+- **Request checks:** same-origin only; JSON of at most 2 KB, measured on the actual body; a strict schema that rejects extra fields.
+- **Scores recomputed on the server:** points are recalculated from the raw results.
+- **Usage limits** in Upstash Redis, which fail closed: 5 per 10 minutes and 20 per day per hashed IP, and 200 per day for the whole site.
+- **Provider call:** 15-second timeout and an output-token cap.
+- **AI output validated** on both server and browser: no numbers, links, unapproved reference IDs, prescriptions, medical advice, promises or dates.
+- **Logging:** errors only, by category.
+- **Tests:** 44 tests in `lib/explain/`.
+
+Still to verify before release:
+
+- a real provider call on a Preview deployment;
+- the gateway account's spending controls;
+- a review of generated wording by an H2F/AFT reviewer.
+
+See `docs/ai-explanations.md`.
 
 ## Not verified
 

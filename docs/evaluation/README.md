@@ -5,7 +5,8 @@ Prepared 3 October 2026 for a small, voluntary Soldier usability pilot and for a
 **Status statement.** RuckOn Fitness is an unofficial tool from RuckOn Fitness LLC. It has **no** Army
 endorsement, professional (H2F, medical or legal) approval, security certification, or authorization to operate
 (ATO). It is not a system of record. Personalized training plans are built but **switched off in production**
-until a qualified reviewer approves them. Nothing in this package says any organization has agreed to review,
+until a qualified reviewer approves them. AI result explanations are also built but switched off in production
+until their provider, usage limits and review are in place (`docs/ai-explanations.md`). Nothing in this package says any organization has agreed to review,
 sponsor or take part in a pilot.
 
 | # | Document | What it answers |
