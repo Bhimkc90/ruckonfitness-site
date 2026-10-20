@@ -877,7 +877,8 @@ export function generatePlan(input: {
       status: "needs-review",
       reasons: [
         "You entered instructions or restrictions that RuckOn cannot interpret. RuckOn does not read medical profiles or written restrictions.",
-        "Share your AFT result and your instructions with your provider or unit H2F team. If the checkboxes above fully cover your instructions, select them and clear the text box.",
+        "Share your AFT result and your instructions with your provider or unit H2F team.",
+        "If your instructions only ask you to avoid running, jumping, lifting weights, or putting weight on your hands: go back to the health check, clear the text box, then select those movements under \"Movements you must avoid\" on the Preferences step.",
       ],
     };
   }

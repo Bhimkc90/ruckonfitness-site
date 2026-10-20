@@ -5,6 +5,7 @@ import { useSyncExternalStore } from "react";
 import { drillHref, exerciseHref, formatSourceRef, getDrill, getExercise } from "@/lib/library";
 import { activities } from "@/lib/training/templates";
 import { exerciseAllowed } from "@/lib/training/engine";
+import { blockProgression, formatReps, formatSets } from "@/lib/training/progression";
 import type { EquipmentOption, PlanBlock, PlanItem, Prescription, Restriction } from "@/lib/training/types";
 import { localToday } from "@/lib/aft/validation";
 
@@ -16,10 +17,7 @@ export function useToday(): string | null {
 }
 
 export function formatPrescription(p: Prescription): string {
-  const sets = p.sets && (/^\d+$/.test(p.sets) ? `${p.sets} ${p.sets === "1" ? "set" : "sets"}` : p.sets);
-  // Bare counts ("4", "8–10", "up to 10") get a unit; descriptive values are shown as written.
-  const reps = p.reps && (/^(up to )?\d+(–\d+)?$/.test(p.reps) ? `${p.reps} ${p.reps === "1" ? "rep" : "reps"}` : p.reps);
-  return [sets, reps, p.time, p.rest && `rest ${p.rest}`, p.intensity, p.notes]
+  return [p.sets && formatSets(p.sets), p.reps && formatReps(p.reps), p.time, p.rest && `rest ${p.rest}`, p.intensity, p.notes]
     .filter(Boolean)
     .join(" · ");
 }
@@ -168,6 +166,7 @@ export function BlockView({
           );
         })}
       </ul>
+      <BlockProgressionNote block={block} />
       <details className="mt-2 text-xs text-ink-2">
         <summary className="cursor-pointer hover:text-ink">Sources and assumptions</summary>
         <ul className="mt-1 list-disc space-y-0.5 pl-4">
@@ -180,6 +179,18 @@ export function BlockView({
         </ul>
       </details>
     </li>
+  );
+}
+
+// Generated from the block's own prescriptions, so maintenance work is never described as progressing.
+function BlockProgressionNote({ block }: { block: PlanBlock }) {
+  const changes = blockProgression(block);
+  return (
+    <p className="mt-2 text-xs text-ink-2">
+      {changes.length
+        ? `Weeks 3–4: ${changes.join("; ")}, unless an earlier session was rated too hard or painful.`
+        : "Weeks 3–4: no change."}
+    </p>
   );
 }
 

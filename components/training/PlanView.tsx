@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, ClipboardPlus, Info, Link2, Minus, RotateCcw } from "lucide-react";
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, ClipboardPlus, Info, Link2, Minus, PauseCircle, RotateCcw } from "lucide-react";
 import { aftEventInfo } from "@/lib/aft/scoring";
 import { describeCategory, formatInstantDate, formatRaw, formatSignedPoints, formatTestDate } from "@/lib/aft/format";
 import { categoryOf } from "@/lib/aft/progress";
@@ -22,9 +22,10 @@ import { weekWindow, weekdayLabels, weekdayOf } from "@/lib/training/engine";
 import {
   adherence,
   compareWithBaseline,
+  PAIN_PAUSE_MESSAGE,
   currentWeek,
+  firstPainReport,
   nextSession,
-  painReported,
   planCompletions,
   progressionHeld,
   reassessmentCandidates,
@@ -92,7 +93,8 @@ function ActivePlan({ plan, completions, today, results }: { plan: StoredPlan; c
   const stats = adherence(plan, completions, today);
   const next = nextSession(plan, completions, today);
   const week = currentWeek(plan, today);
-  const pain = painReported(plan, completions);
+  const painReport = firstPainReport(plan, completions);
+  const paused = painReport !== null;
   const dated = sessionsByDate(plan);
   const aftDate = plan.preferences.nextAftDate;
 
@@ -100,12 +102,16 @@ function ActivePlan({ plan, completions, today, results }: { plan: StoredPlan; c
     <div className="space-y-5">
       <PageHeader
         title="Training plan"
-        description={`Four-week starter plan from ${formatTestDate(plan.startDate)} · ${week <= PLAN_WEEKS ? `week ${week} of ${PLAN_WEEKS}` : "finished"}`}
+        description={`Four-week starter plan from ${formatTestDate(plan.startDate)} · ${
+          paused ? "paused after a pain report" : week <= PLAN_WEEKS ? `week ${week} of ${PLAN_WEEKS}` : "finished"
+        }`}
         actions={
           <>
-            <ButtonLink href="/training-plan/new" variant="secondary">
-              New plan
-            </ButtonLink>
+            {!paused && (
+              <ButtonLink href="/training-plan/new" variant="secondary">
+                New plan
+              </ButtonLink>
+            )}
             <button
               type="button"
               className={buttonClass("ghost")}
@@ -121,12 +127,15 @@ function ActivePlan({ plan, completions, today, results }: { plan: StoredPlan; c
 
       <PlanDisclaimer />
 
-      {pain && (
-        <p role="alert" className="flex gap-2 rounded-lg border border-bad/40 bg-bad/5 p-3 text-sm text-ink">
+      {paused && (
+        <div role="alert" className="flex gap-2 rounded-lg border border-bad/40 bg-bad/5 p-3 text-sm text-ink">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-bad" aria-hidden />
-          You reported pain during this plan. Stop training and talk to a medical provider or your unit&apos;s H2F team. RuckOn will not increase
-          your workload.
-        </p>
+          <div>
+            <p className="font-semibold">Plan paused</p>
+            <p className="mt-0.5">{PAIN_PAUSE_MESSAGE}</p>
+            <p className="mt-1 text-ink-2">Your sessions and recorded workouts stay below for reference.</p>
+          </div>
+        </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -153,8 +162,16 @@ function ActivePlan({ plan, completions, today, results }: { plan: StoredPlan; c
           </ul>
         </Card>
         <Card>
-          <p className="text-sm text-ink-2">Next workout</p>
-          {next ? (
+          <p className="text-sm text-ink-2">{paused ? "Plan status" : "Next workout"}</p>
+          {paused ? (
+            <>
+              <p className="mt-1 flex items-center gap-1.5 font-semibold text-ink">
+                <PauseCircle className="h-4 w-4 text-bad" aria-hidden />
+                Paused
+              </p>
+              <p className="text-sm text-ink-2">Pain reported {formatInstantDate(painReport.completedAt)}. No workout is suggested while the plan is paused.</p>
+            </>
+          ) : next ? (
             <>
               <p className="mt-1 font-semibold text-ink">{next.session.title}</p>
               <p className="text-sm text-ink-2">
@@ -214,6 +231,7 @@ function ActivePlan({ plan, completions, today, results }: { plan: StoredPlan; c
                     today={today}
                     completion={done.get(session.id)}
                     useBuild={w >= 3 && !held}
+                    paused={paused}
                     afterAft={!!aftDate && date > aftDate}
                     onAftDay={aftDate === date}
                     onError={setMessage}
@@ -413,6 +431,7 @@ function SessionRow({
   today,
   completion,
   useBuild,
+  paused,
   afterAft,
   onAftDay,
   onError,
@@ -423,6 +442,7 @@ function SessionRow({
   today: string;
   completion?: SessionCompletion;
   useBuild: boolean;
+  paused: boolean;
   afterAft: boolean;
   onAftDay: boolean;
   onError: (message: string) => void;
@@ -432,7 +452,7 @@ function SessionRow({
   const [notes, setNotes] = useState("");
   const [moveTo, setMoveTo] = useState(date);
   const range = weekWindow(plan.startDate, session.week);
-  const status = completion ? "Completed" : date < today ? "Not recorded" : date === today ? "Today" : "Upcoming";
+  const status = completion ? "Completed" : date < today ? "Not recorded" : paused ? "Paused" : date === today ? "Today" : "Upcoming";
 
   const save = () => {
     if (!difficulty) return;
@@ -456,7 +476,7 @@ function SessionRow({
 
   return (
     <li id={`session-${session.id}`} className="scroll-mt-28 rounded-lg border border-line bg-canvas/40 p-3 lg:scroll-mt-6">
-      <details open={date === today && !completion}>
+      <details open={date === today && !completion && !paused}>
         <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2">
           <span>
             <span className="text-sm font-medium text-ink">
@@ -496,6 +516,10 @@ function SessionRow({
                 Undo completion
               </button>
             </div>
+          ) : paused ? (
+            <p className="rounded-lg border border-line p-3 text-sm text-ink-2">
+              Paused after a pain report. New sessions can&apos;t be recorded or moved while the plan is paused.
+            </p>
           ) : (
             <div className="rounded-lg border border-line p-3">
               <fieldset className="text-sm">
@@ -532,23 +556,25 @@ function SessionRow({
             </div>
           )}
 
-          <div className="flex flex-wrap items-end gap-2 text-sm">
-            <label className="block">
-              <span className="text-xs text-ink-2">Move within week {session.week}</span>
-              <input
-                type="date"
-                value={moveTo}
-                min={range.from}
-                max={range.to}
-                onChange={(e) => setMoveTo(e.target.value)}
-                className="mt-1 block rounded-lg border border-line-strong bg-canvas px-3 py-1.5 text-sm text-ink"
-              />
-            </label>
-            <button type="button" onClick={move} disabled={moveTo === date} className={buttonClass("secondary", "py-1.5")}>
-              Reschedule
-            </button>
-            <Chip>Completion history is kept</Chip>
-          </div>
+          {!paused && (
+            <div className="flex flex-wrap items-end gap-2 text-sm">
+              <label className="block">
+                <span className="text-xs text-ink-2">Move within week {session.week}</span>
+                <input
+                  type="date"
+                  value={moveTo}
+                  min={range.from}
+                  max={range.to}
+                  onChange={(e) => setMoveTo(e.target.value)}
+                  className="mt-1 block rounded-lg border border-line-strong bg-canvas px-3 py-1.5 text-sm text-ink"
+                />
+              </label>
+              <button type="button" onClick={move} disabled={moveTo === date} className={buttonClass("secondary", "py-1.5")}>
+                Reschedule
+              </button>
+              <Chip>Completion history is kept</Chip>
+            </div>
+          )}
         </div>
       </details>
     </li>

@@ -6,6 +6,7 @@ import { formatRaw, formatTestDate } from "@/lib/aft/format";
 import { defaultSessionDate, weekdayLabels, SOURCES_FOR_PLAN } from "@/lib/training/engine";
 import type { EquipmentOption, PlanDraft, PlanSession, Restriction } from "@/lib/training/types";
 import { PLAN_WEEKS } from "@/lib/training/templates";
+import { planProgression } from "@/lib/training/progression";
 import { Card } from "@/components/ui/Card";
 import { Chip, PassFailBadge } from "@/components/ui/StatusBadge";
 import { BlockView } from "./PlanParts";
@@ -99,6 +100,7 @@ export function NotesCard({ plan }: { plan: PlanDraft }) {
         </>
       )}
       {plan.timeline && <TimelineNote plan={plan} />}
+      <ProgressionNote plan={plan} />
       <h3 className="mt-4 text-sm font-semibold text-ink">Reassessment</h3>
       <p className="mt-1 text-sm text-ink">{plan.reassessment}</p>
       <p className="mt-3 text-xs text-ink-2">Planned running: about {plan.weeklyRunningMinutes} minutes a week.</p>
@@ -120,6 +122,31 @@ export function NotesCard({ plan }: { plan: PlanDraft }) {
       </details>
       <p className="mt-3 text-xs text-ink-2">Template version: {plan.templateVersion}</p>
     </Card>
+  );
+}
+
+// Read from the plan's prescriptions, so it names exactly what changes and what stays the same.
+function ProgressionNote({ plan }: { plan: PlanDraft }) {
+  const { progresses, unchanged } = planProgression(plan);
+  return (
+    <>
+      <h3 className="mt-4 text-sm font-semibold text-ink">What changes in weeks 3–4</h3>
+      {progresses.length > 0 ? (
+        <>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink">
+            {progresses.map((p) => (
+              <li key={`${p.title}${p.changes.join()}`}>
+                {p.title}: {p.changes.join("; ")}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs text-ink-2">Only if no earlier session was rated too hard and no pain was reported; otherwise weeks 1–2 repeat.</p>
+        </>
+      ) : (
+        <p className="mt-1 text-sm text-ink">Nothing in the main workouts increases; all four weeks are the same.</p>
+      )}
+      {unchanged.length > 0 && <p className="mt-1 text-sm text-ink">Stays the same in all four weeks: {unchanged.join(", ")}.</p>}
+    </>
   );
 }
 

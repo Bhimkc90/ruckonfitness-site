@@ -24,6 +24,8 @@ import {
 } from "@/lib/aft/format";
 import { useAftResults, useHydrated } from "@/lib/storage/aftResults";
 import { useSettings } from "@/lib/storage/settings";
+import { activePlan, useTrainingData } from "@/lib/storage/trainingPlans";
+import { painReported } from "@/lib/training/progress";
 import { Card, PageHeader } from "@/components/ui/Card";
 import { ButtonLink, segmentClass, segmentGroupClass } from "@/components/ui/Button";
 import { fieldFocus } from "@/components/ui/form";
@@ -80,6 +82,7 @@ export default function Dashboard() {
   const hydrated = useHydrated();
   const results = useAftResults();
   const settings = useSettings();
+  const training = useTrainingData();
   // Chosen on this page; until then the defaults from Settings apply.
   const [chosenEvent, setEvent] = useState<AftEventCode | null>(null);
   const [chosenMode, setMode] = useState<Mode | null>(null);
@@ -94,6 +97,9 @@ export default function Dashboard() {
   if (!summary) return <DashboardEmpty />;
 
   const { latest } = summary;
+  // A plan paused by a pain report doesn't offer starting another plan here; the plan page explains the pause.
+  const plan = activePlan(training);
+  const planPaused = plan !== null && painReported(plan, training.completions);
   const latestResult = latest.record.result;
   const comparable = latest.previousComparable
     ? progress.find((item) => item.record.id === latest.previousComparable!.id)
@@ -154,7 +160,7 @@ export default function Dashboard() {
               <History className="h-4 w-4" aria-hidden />
               View history
             </ButtonLink>
-            {TRAINING_PLANS_ENABLED && (
+            {TRAINING_PLANS_ENABLED && !planPaused && (
               <ButtonLink href={`/training-plan/new?baseline=${latest.record.id}`} variant="secondary">
                 Suggest training plan
               </ButtonLink>

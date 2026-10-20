@@ -425,7 +425,8 @@ export default function PlanWizard() {
                     <li key={r}>{r}</li>
                   ))}
                 </ul>
-                <StepButtons back={back} />
+                {/* The instructions box is on the health check, so the review path goes back there. */}
+                <StepButtons back={outcome.status === "needs-review" ? () => setStep("screening") : back} />
               </Card>
             )}
             {outcome.status === "ready" && (

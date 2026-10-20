@@ -1,7 +1,7 @@
 import type { ActivityId, RunningVolume } from "./types";
 
 // Version stored with every plan so later template changes never silently rewrite an active plan.
-export const TEMPLATE_VERSION = "starter-4wk-v3-draft (2026-10-05, not professionally reviewed)";
+export const TEMPLATE_VERSION = "starter-4wk-v3-draft (2026-10-20, not professionally reviewed)";
 
 // Citations used by the templates. Page numbers are the printed page numbers.
 export const S = {
@@ -46,21 +46,23 @@ export const ASSUMPTIONS = {
     "Session mix: every week keeps one strength and one aerobic session for maintenance; extra days go to the focus events in priority order (deadlift, push-up, or plank → strength; 2-mile run → running; sprint-drag-carry → speed, then non-sprint SDC skills). With 4+ days a weekly speed session is kept; with 5 days one is a recovery session.",
   maintenanceRun: "Maintenance runs are capped at 20 minutes; runs for a 2-mile run focus use the full per-run cap.",
   loadedHinge:
-    "Loaded hinge: 2 sets (weeks 1–2), then 3 sets (weeks 3–4) of 8–10 reps at RPE 6–7 (3–4 reps in reserve) with 90 seconds' rest. No maximum or percentage-based loads.",
-  kettlebellCircuit: "Kettlebell stations: 2 rounds (weeks 1–2), then 3 rounds (weeks 3–4) of 1-minute stations with 60 seconds between rounds.",
+    "Loaded hinge: 8–10 reps (10–12 with dumbbells) at RPE 6–7 (3–4 reps in reserve) with 90 seconds' rest. Development: 2 sets in weeks 1–2, then 3 sets in weeks 3–4; maintenance stays at 2 sets. No maximum or percentage-based loads.",
+  kettlebellCircuit:
+    "Kettlebell stations: 1-minute stations with 60 seconds between rounds. Development: 2 rounds in weeks 1–2, then 3 rounds in weeks 3–4; maintenance stays at 2 rounds.",
   hrpPractice:
-    "HRP practice: 3 sets (weeks 1–2), then 4 sets (weeks 3–4) of about half your baseline repetitions (5–25), 60–90 seconds' rest, stopping a set when a rep breaks standard.",
+    "HRP practice: sets of about half your baseline repetitions (5–25), 60–90 seconds' rest, stopping a set when a rep breaks standard. Development: 3 sets in weeks 1–2, then 4 sets in weeks 3–4; maintenance stays at 2 sets.",
   pushAccessory:
-    "Push accessory: with equipment and no lifting restriction, push-up development adds a loaded press: the Supine Chest Press station with kettlebells (2 rounds, then 3, of 1 minute) or the Bench Press with a barbell or dumbbells (2 sets, then 3, of 8–10 reps at RPE 6–7, 90 seconds' rest). If you avoid weight on your hands, the same press replaces push-up practice; it does not train the event itself.",
-  plankPractice: "Plank practice: 2 holds (weeks 1–2), then 3 holds (weeks 3–4) of about half your baseline time (20 seconds to 2:00), 60 seconds' rest.",
+    "Push accessory: with equipment and no lifting restriction, push-up development adds a loaded press: the Supine Chest Press station with kettlebells (1-minute rounds) or the Bench Press with a barbell or dumbbells (8–10 reps at RPE 6–7, 90 seconds' rest), 2 rounds or sets in weeks 1–2, then 3 in weeks 3–4. If you avoid weight on your hands, the same press replaces push-up practice (it does not train the event itself); when push-ups are only maintained, it stays at 2.",
+  plankPractice:
+    "Plank practice: holds of about half your baseline time (20 seconds to 2:00), 60 seconds' rest. Development: 2 holds in weeks 1–2, then 3 holds in weeks 3–4; maintenance stays at 2 holds.",
   runningCap:
     "Running: each run is capped by your reported recent running (10, 20, 25, or 30 minutes) and weekly running never exceeds the top of your reported range. Running time does not increase during the plan.",
   intervals:
-    "30:60 intervals: 4 repeats (3 if you are new to training) in weeks 1–2 and 6 (4 if new) in weeks 3–4 at RPE 7, only if you already run regularly.",
+    "30:60 intervals at RPE 7, only if you already run regularly: 4 repeats (3 if you are new to training) in weeks 1–2. For sprint-drag-carry development, 6 (4 if new) in weeks 3–4; otherwise weeks 3–4 stay the same.",
   durations:
     "Time estimates: Preparation Drill 10 minutes (condensed 5), Recovery Drill 8, Four for the Core 7, Military Movement Drill 1 5, one round of Conditioning Drills 1 and 2 8.",
   progressionGate:
-    "Weeks 3–4 add sets, repeats, or drill repetitions only if no earlier session was rated too hard and no pain was reported; otherwise the weeks 1–2 level repeats.",
+    "Where weeks 3–4 add sets, rounds, holds, repeats, or drill repetitions (development work and some drills; maintenance work stays the same), they do so only if no earlier session was rated too hard and no pain was reported; otherwise the weeks 1–2 level repeats.",
   scheduling:
     "Strength, speed, and conditioning sessions count as hard and are never scheduled on back-to-back days; a hard session becomes a recovery session when your chosen days make that impossible.",
   reassessment:

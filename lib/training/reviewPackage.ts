@@ -1,8 +1,9 @@
 import { scoreAft } from "@/lib/aft/scoring";
 import type { AftInput } from "@/lib/aft/types";
-import { getDrill, getExercise } from "@/lib/library";
+import { getExercise } from "@/lib/library";
 import { PAIN_MESSAGE, generatePlan } from "./engine";
-import { ASSUMPTIONS, MINUTES, PLAN_WEEKS, SUPPORTED_PLAN_WEEKS, TEMPLATE_VERSION, activities, runningLimits, type AssumptionId } from "./templates";
+import { ASSUMPTIONS, MINUTES, PLAN_WEEKS, SUPPORTED_PLAN_WEEKS, TEMPLATE_VERSION, runningLimits, type AssumptionId } from "./templates";
+import { itemName } from "./progression";
 import { buildSamplePlans } from "./samples";
 import type { BaselineSnapshot, DaysPerWeek, EquipmentOption, PlanBlock, PlanItem, Preferences, Prescription, Restriction, RunningVolume, SessionMinutes, WeekdayId } from "./types";
 
@@ -45,12 +46,6 @@ const fmt = (p: Prescription) =>
   [p.sets && `sets: ${p.sets}`, p.reps && `reps: ${p.reps}`, p.time && `time: ${p.time}`, p.rest && `rest: ${p.rest}`, p.intensity && `effort: ${p.intensity}`, p.notes]
     .filter(Boolean)
     .join("; ");
-
-function itemName(item: PlanItem) {
-  if (item.kind === "drill") return getDrill(item.drillId)!.name;
-  if (item.kind === "exercise") return getExercise(item.exerciseId)!.name;
-  return activities[item.activityId].name;
-}
 
 type Variant = { block: PlanBlock; rows: string[]; firstSeen: string };
 

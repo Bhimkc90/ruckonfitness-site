@@ -54,6 +54,19 @@ export function painReported(plan: StoredPlan, completions: SessionCompletion[])
   return completions.some((c) => c.planId === plan.id && c.pain);
 }
 
+// A pain report pauses the plan: no next workout is suggested and new sessions can't be recorded or moved, while
+// the plan and its records stay visible. RuckOn sets no rule for resuming; that is for a provider or H2F team.
+export const PAIN_PAUSE_MESSAGE =
+  "You reported pain during this plan. Stop training and talk to a medical provider or your unit's H2F team. RuckOn will not increase your workload.";
+
+export function firstPainReport(plan: StoredPlan, completions: SessionCompletion[]): SessionCompletion | null {
+  return (
+    completions
+      .filter((c) => c.planId === plan.id && c.pain)
+      .sort((a, b) => a.completedAt.localeCompare(b.completedAt))[0] ?? null
+  );
+}
+
 // Weeks 3–4 use the build prescription only when no earlier session was too hard or painful.
 export function progressionHeld(plan: StoredPlan, completions: SessionCompletion[], week: number): boolean {
   if (week < 3) return false;
