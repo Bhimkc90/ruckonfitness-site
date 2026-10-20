@@ -7,6 +7,9 @@ While the flag is off, `/training-plan` shows three preview examples built by th
 AFT results (`lib/training/samples.ts`): a slow 2-mile run, a low deadlift, and a slow SDC with short sessions.
 They are labeled as unreviewed examples, and personalized plans, starting plans, and tracking stay unavailable.
 
+A protected reviewer Preview with plans enabled (Preview environment only) is described in
+`docs/training-review/preview.md`, with access instructions, verification screenshots, and open questions.
+
 To preview the full personalized flow locally:
 
 ```bash

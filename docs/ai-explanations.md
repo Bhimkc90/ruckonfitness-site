@@ -1,7 +1,10 @@
 # "Explain my results" (AI explanations): setup and release
 
-**Status: off in production.** Both flags are unset in Vercel, so the button is hidden and `POST /api/explain`
-returns 404. No real provider call has been verified yet (see "Remaining steps").
+**Status: off in production.** Both flags are unset for Production in Vercel, so the button is hidden and
+`POST /api/explain` returns 404. For Preview, `NEXT_PUBLIC_AI_EXPLAIN` and `AI_EXPLAIN` are set to `disabled`
+(the salt is kept) so reviewers of the training-plan Preview don't hit a 503 from the missing rate-limit store
+(`docs/training-review/preview.md`). Set both to `enabled` for Preview at step 4 below. No real provider call
+has been verified yet (see "Remaining steps").
 
 ## What it does
 
