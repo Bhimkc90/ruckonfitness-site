@@ -31,10 +31,13 @@
      two-column layouts beside the sidebar without stretching edge to edge on large screens. */
   --container-content: 94rem;
 
-  /* Drill-category accents (always paired with a text label). */
+  /* Drill-category accents (always paired with a text label). With the two tones below they form the library tile
+     palette: teal (prep), amber (activity), violet (recovery), blue, and coral. Each is at least 4.5:1 on white. */
   --color-prep: #0f766e;
   --color-activity: #b45309;
-  --color-recovery: #4338ca;
+  --color-recovery: #6d28d9;
+  --color-tone-blue: #1d4ed8;
+  --color-tone-coral: #c2412d;
 }
 
 .theme-dark {
@@ -57,7 +60,9 @@
   --color-card-line: #3f434c;
   --color-prep: #5eead4;
   --color-activity: #fdba74;
-  --color-recovery: #a5b4fc;
+  --color-recovery: #c4b5fd;
+  --color-tone-blue: #93c5fd;
+  --color-tone-coral: #fca38f;
 }
 
 /* Keeps running text at a comfortable line length inside wide sections; charts, tables, and figures still use

@@ -1,8 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Footprints, Info, RotateCcw, Search, X } from "lucide-react";
+import {
+  Activity,
+  ArrowLeftRight,
+  ArrowRight,
+  BookOpen,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Dumbbell,
+  Flame,
+  Footprints,
+  Hand,
+  Info,
+  LayoutGrid,
+  Repeat,
+  RotateCcw,
+  Search,
+  Shuffle,
+  Target,
+  Timer,
+  Wind,
+  X,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import type { AftEventCode } from "@/lib/aft/types";
 import type { DrillId, Equipment, Exercise, Phase, Purpose } from "@/lib/library/types";
 import {
@@ -20,12 +46,12 @@ import {
 } from "@/lib/library";
 import { GENERAL_NOTE, filterSections, librarySections, matchingExerciseCount, viewExerciseCount, type LibrarySection, type LibraryView } from "@/lib/library/sections";
 import { activities } from "@/lib/training/templates";
-import { buttonClass, segmentClass } from "@/components/ui/Button";
+import { buttonClass } from "@/components/ui/Button";
 import { fieldFocus } from "@/components/ui/form";
 import { Tag } from "./LibraryBits";
 import { DemonstrationNote, ExecutionDetails, FormGuidance, Substitutions, hasFormGuidance } from "./ExerciseDetail";
 import { FIGURE_READING_NOTE, FigureList } from "./FigureGallery";
-import { accents } from "./accents";
+import { accents, categoryTone, tones, type ToneName } from "./accents";
 import { ExerciseThumbSmall } from "./ExerciseImage";
 import { figuresInDrill } from "@/lib/library/images";
 
@@ -146,29 +172,40 @@ export default function LibraryBrowser() {
         {drillSections.length > 0 && <JumpLinks label="Drills" items={drillSections} />}
         {otherSections.length > 0 && <JumpLinks label={view === "general" ? "Groups" : "More"} items={otherSections} />}
         {showAerobic && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <a href="#aerobic-activities" className="inline-flex items-center gap-1.5 rounded-full border border-card-line bg-card px-3 py-1 text-sm font-medium text-ink hover:border-ink">
-              Aerobic activities
-            </a>
-          </div>
+          <TileGrid label="Activities">
+            <li>
+              <a href="#aerobic-activities" className={tileClass("amber")}>
+                <TileIcon icon={Footprints} tone="amber" />
+                <TileText title="Aerobic activities" description="Walking and running" />
+              </a>
+            </li>
+          </TileGrid>
         )}
       </nav>
 
       {/* Search and filters */}
       <section aria-label="Search and filters" className="rounded-xl border border-card-line bg-card p-3 shadow-sm sm:p-4">
-        <div role="group" aria-label="Supports AFT event" className="mb-3 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs font-semibold text-ink">Supports AFT event</span>
-          {(["all", ...(Object.keys(aftEventLabels) as AftEventCode[])] as const).map((code) => (
-            <button
-              key={code}
-              type="button"
-              aria-pressed={filters.aftEvent === code}
-              onClick={() => set("aftEvent", code)}
-              className={`${segmentClass(filters.aftEvent === code)} border ${filters.aftEvent === code ? "border-accent" : "border-line-strong"} py-1 text-xs`}
-            >
-              {code === "all" ? "All events" : aftEventLabels[code]}
-            </button>
-          ))}
+        <div role="group" aria-label="Supports AFT event" className="mb-4">
+          <span className="mb-2 block text-xs font-semibold text-ink">Supports AFT event</span>
+          <div className={tileGridClass}>
+            {(["all", ...(Object.keys(aftEventLabels) as AftEventCode[])] as const).map((code) => {
+              const selected = filters.aftEvent === code;
+              const tile = EVENT_TILES[code];
+              return (
+                <button key={code} type="button" aria-pressed={selected} onClick={() => set("aftEvent", code)} className={tileClass(tile.tone, selected)}>
+                  <span className="flex items-start justify-between gap-2">
+                    <TileIcon icon={tile.icon} tone={tile.tone} />
+                    {selected && (
+                      <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${tones[tile.tone].badge}`} aria-hidden>
+                        <Check className="h-4 w-4" strokeWidth={3} />
+                      </span>
+                    )}
+                  </span>
+                  <TileText title={code === "all" ? "All events" : aftEventLabels[code]} description={tile.description} />
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className={`grid grid-cols-2 gap-3 md:items-end ${view === "military" ? "md:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]" : "md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]"}`}>
           <label className="col-span-2 block text-xs md:col-span-1">
@@ -256,22 +293,103 @@ export default function LibraryBrowser() {
   );
 }
 
+// Tiles: two columns on phones, three on tablets, six on desktop (every group here has six or fewer), with the grid
+// width capped so tiles stay near-square. Tiles grow with their text rather than clip it.
+const tileGridClass = "grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:max-w-[72rem] lg:grid-cols-6";
+
+function tileClass(tone: ToneName, selected = false) {
+  return `flex min-h-[7.5rem] flex-col justify-between gap-3 rounded-lg border-2 p-3 text-left transition-colors sm:min-h-[10rem] ${
+    selected ? tones[tone].selected : `${tones[tone].tile} ${tones[tone].hover} hover:shadow-sm`
+  }`;
+}
+
+function TileIcon({ icon: Icon, tone }: { icon: LucideIcon; tone: ToneName }) {
+  return (
+    <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${tones[tone].icon}`} aria-hidden>
+      <Icon className="h-5 w-5" />
+    </span>
+  );
+}
+
+function TileText({ title, description }: { title: string; description: string }) {
+  return (
+    <span className="block">
+      <span className="block text-sm font-semibold leading-snug text-ink">{title}</span>
+      <span className="mt-0.5 block text-xs text-ink-2">{description}</span>
+    </span>
+  );
+}
+
+function TileGrid({ label, children }: { label: string; children: ReactNode }) {
+  const id = `tiles-${label.toLowerCase()}`;
+  return (
+    <div>
+      <p id={id} className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-2">
+        {label}
+      </p>
+      <ul aria-labelledby={id} className={tileGridClass}>
+        {children}
+      </ul>
+    </div>
+  );
+}
+
+const EVENT_TILES: Record<AftEventCode | "all", { tone: ToneName; icon: LucideIcon; description: string }> = {
+  all: { tone: "neutral", icon: LayoutGrid, description: "No event filter" },
+  MDL: { tone: "teal", icon: Dumbbell, description: "MDL" },
+  HRP: { tone: "blue", icon: Hand, description: "HRP" },
+  SDC: { tone: "amber", icon: ArrowLeftRight, description: "SDC" },
+  PLK: { tone: "violet", icon: Timer, description: "PLK" },
+  "2MR": { tone: "coral", icon: Footprints, description: "2MR" },
+};
+
+const SECTION_ICONS: Record<string, LucideIcon> = {
+  "preparation-drill": Flame,
+  "conditioning-drill-1": Zap,
+  "conditioning-drill-2": Activity,
+  "four-for-the-core": Target,
+  "military-movement-drill-1": Shuffle,
+  "recovery-drill": Wind,
+  "more-atp": BookOpen,
+  "general-strength": Dumbbell,
+  "general-muscular-endurance": Repeat,
+  "general-core-stability": Target,
+  "general-conditioning-agility": Zap,
+};
+
+const GENERAL_TONES: Record<string, ToneName> = {
+  "general-strength": "blue",
+  "general-muscular-endurance": "teal",
+  "general-core-stability": "violet",
+  "general-conditioning-agility": "coral",
+};
+
+function sectionTone(section: LibrarySection): ToneName {
+  if (section.kind === "drill") return categoryTone[section.drill.officialCategory];
+  if (section.kind === "atp") return "blue";
+  return GENERAL_TONES[section.id] ?? "neutral";
+}
+
+function sectionCategory(section: LibrarySection): string {
+  if (section.kind === "drill") return accents[section.drill.officialCategory].label;
+  return section.kind === "atp" ? "ATP 7-22.02" : "RuckOn group";
+}
+
 function JumpLinks({ label, items }: { label: string; items: { section: LibrarySection; exercises: Exercise[] }[] }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="mr-1 text-xs font-medium uppercase tracking-wide text-ink-2">{label}</span>
-      {items.map(({ section, exercises: shown }) => (
-        <a
-          key={section.id}
-          href={`#${section.id}`}
-          className="inline-flex items-center gap-1.5 rounded-full border border-card-line bg-card px-3 py-1 text-sm font-medium text-ink hover:border-ink"
-        >
-          <span className={`h-2 w-2 rounded-full ${sectionAccent(section).bar}`} aria-hidden />
-          {section.title}
-          <span className="text-xs tabular-nums text-ink-2">{shown.length}</span>
-        </a>
-      ))}
-    </div>
+    <TileGrid label={label}>
+      {items.map(({ section, exercises: shown }) => {
+        const tone = sectionTone(section);
+        return (
+          <li key={section.id}>
+            <a href={`#${section.id}`} className={`h-full ${tileClass(tone)}`}>
+              <TileIcon icon={SECTION_ICONS[section.id] ?? BookOpen} tone={tone} />
+              <TileText title={section.title} description={`${sectionCategory(section)} · ${shown.length} ${shown.length === 1 ? "exercise" : "exercises"}`} />
+            </a>
+          </li>
+        );
+      })}
+    </TileGrid>
   );
 }
 
@@ -418,7 +536,7 @@ function SectionBlock({
     <section id={section.id} aria-labelledby={sectionHeadingId} className="scroll-mt-32 lg:scroll-mt-6">
       <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b-2 border-ink pb-4">
         <div className="flex min-w-0 max-w-3xl gap-3">
-          <span className={`mt-1 w-1 shrink-0 self-stretch rounded-full ${accent.bar}`} aria-hidden />
+          <span className={`mt-1 w-1 shrink-0 self-stretch rounded-full ${tones[sectionTone(section)].bar}`} aria-hidden />
           <div className="min-w-0">
             <p className={`text-xs font-semibold uppercase tracking-wider ${accent.text}`}>
               {section.kind === "drill"
