@@ -65,6 +65,10 @@ difficulty, pain, and notes → reschedule within the week (completions kept) �
 adherence → link a reassessment → create the next plan from it. Earlier plans keep their baselines, versions,
 completions, and reassessments.
 
+A reported pain pauses the plan: no next workout or new-plan action is offered and new sessions can't be recorded
+or moved, while every session and record stays visible. RuckOn sets no rule for resuming (see
+`docs/training-review/preview.md`, decision 6).
+
 The "Explain my results" AI feature is separate and does not explain, generate, or alter plans. If AI explanations
 of plans are added after this review, they may only restate verified plan facts and must stay behind this flag.
 

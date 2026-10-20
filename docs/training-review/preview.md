@@ -6,14 +6,14 @@ there**, and this Preview is not approval to release them.
 
 | | |
 |---|---|
-| Preview URL | https://ruckonfitness-site-73oapygjc-ruckonfitness.vercel.app |
-| Deployment | `dpl_xXY7P3bfVRQx9QdqMmhh2rQ4thKM`, Vercel target `preview` |
-| Commit | `99b96b659f1c0452aec06c80a223ffd2b6cef8e0` (`main`, the same application code Production serves) |
-| Template version | `starter-4wk-v3-draft (2026-10-05, not professionally reviewed)` |
+| Preview URL | https://ruckonfitness-site-dzxeg7tex-ruckonfitness.vercel.app |
+| Deployment | `dpl_5Nu27WnNCzG8joDkVM4cJ7theYTK`, Vercel target `preview` |
+| Commit | `9b96783d46568b7e0c9f1e45691f1e47ca8b6fbb` (`main`, the same application code Production serves) |
+| Template version | `starter-4wk-v3-draft (2026-10-20, not professionally reviewed)`. Same prescriptions as the 2026-10-05 text; the rule wording now says what maintenance does |
 | Created | 20 Oct 2026 |
 
-Earlier Previews from the same day (`…-2te0lxmvx-…` and `…-hnstkdk4w-…`) are superseded. They remain protected,
-but they don't have the focus fixes below. Send reviewers only the URL above.
+Earlier Previews from the same day (`…-2te0lxmvx-…`, `…-hnstkdk4w-…`, `…-73oapygjc-…`, and `…-2mp8powxp-…`) are
+superseded. They remain protected, but they lack some of the fixes below. Send reviewers only the URL above.
 
 ## How this Preview is built
 
@@ -134,45 +134,114 @@ same flags. The desktop Chrome window could not be resized to phone width.
 
 Both were confirmed in Chrome on this Preview after the rebuild.
 
-### Unresolved (reported, not changed)
+### Fixed for review (commit `9b96783`)
 
-These involve wording or behavior under professional review, so they were left as they are:
+1. **Review-path instructions.** The message no longer refers to "the checkboxes above". It now says: go back to
+   the health check, clear the text box, then select the movements under "Movements you must avoid" on the
+   Preferences step. Back on that screen now goes to the health check, where the text box is. `21`
+2. **Progression explanations.** Each block now ends with a line generated from its own weeks 1–2 and weeks 3–4
+   prescriptions, for example:
+   - "Weeks 3–4: Hand-release push-up practice: 3 sets → 4 sets; 8-Count T Push-Up: 5 reps → up to 10 reps;
+     Supine Chest Press: 2 rounds → 3 rounds, unless an earlier session was rated too hard or painful."
+   - "Weeks 3–4: no change." on maintenance blocks.
 
-1. **The review-path message says "If the checkboxes above fully cover your instructions…".** There are no
-   checkboxes on that screen. Its Back button goes to Preferences, while the text box is on Health check.
-2. **After a pain report, the plan still offers "Next workout / Open workout"** next to the "Stop training"
-   banner, and sessions can still be completed. The documented rule only requires the banner.
-3. **Assumption text vs prescriptions.** The assumption text shown with every plan says kettlebell stations go
-   2 → 3 rounds, plank practice 2 → 3 holds, and intervals 4 → 6 repeats. But *maintenance* blocks stay at the
-   weeks 1–2 level (kettlebell maintenance 2 rounds, plank maintenance 2 holds, intervals for a maintained SDC
-   4 repeats). `review-package.md` §3 shows the exact prescriptions ("same" in weeks 3–4).
-4. **Reassessment timing isn't enforced.** Any saved test on or after the plan start can be linked, including
-   one from the same day. The app advises recording it after week 4 but doesn't require it.
-5. **Not tested:** screen readers (VoiceOver, NVDA), Safari and Firefox, and real phones.
+   The plan notes also list "What changes in weeks 3–4" and "Stays the same in all four weeks". The rule text
+   for hinge, kettlebell, push-up, press, plank, interval, and progression-gate assumptions now says maintenance
+   stays the same. The prescriptions are unchanged. A test checks that no maintenance block is described as
+   progressing across a matrix of baselines, equipment, and restrictions. `22`
+3. **Pause after a pain report.** The plan page shows "Plan paused" with the existing guidance ("Stop training
+   and talk to a medical provider or your unit's H2F team…"), and the header reads "paused after a pain report".
+   - The "Next workout / Open workout" card becomes "Plan status: Paused" with the report date.
+   - "New plan", and the dashboard's "Suggest training plan", aren't shown.
+   - Sessions not yet recorded say they can't be recorded or moved while paused.
+   - Every session and recorded workout stays visible with its record. Recorded sessions keep "Undo completion".
+   - The dashboard card shows "Paused" and the same guidance.
+   - No return-to-training rule was added. `23`–`25`
 
-## Questions for the reviewer
+Verified in Chrome on the Preview built from the working tree (`…-2mp8powxp-…`), then again on the Preview built
+from the commit above, with synthetic AFT-0003. Regression tests (1,977), type-check, lint, and the production
+build pass. `review-package.md` was regenerated by its generator, not edited by hand.
 
-The full list with decision boxes is in `review-package.md` §1. These came up in testing:
+### Still open
 
-1. **`focus`, `sessionMix`**: a 382-point pass with no failed events got 2-mile-run and push-up focus, and **no
-   SDC session** with 3 days (SDC 76 was maintained through strength sessions only). Is that acceptable?
-2. **`runningCap`, `maintenanceRun`**: with 31–60 min/week reported, the plan schedules about 40 minutes of
-   running a week (20 with 2 days), with no increase over 4 weeks. Is that right for a 2-mile-run focus?
-3. **`durations`**: easy-run sessions are shown as about 38 min, strength as about 43 min, and speed as about
-   30 min, against a 45-minute choice. Are the Preparation and Recovery Drill times realistic?
-4. **`scheduling`**: users can move a session anywhere within its week. A move that puts two hard sessions on
-   back-to-back days is allowed with a warning, not blocked. Should it be blocked?
-5. **`progressionGate`**: only "Too hard" or pain holds progression; "Hard" doesn't, and unrecorded sessions
-   don't. Is that sufficient?
-6. **`kettlebellCircuit`, `plankPractice`, `intervals`**: should maintenance blocks progress in weeks 3–4? If
-   not, should the assumption text say they don't (unresolved item 3)?
-7. **`screening`**: is the single pain question and its referral wording adequate? After a pain report, should
-   the plan stop offering workouts (unresolved item 2)? Should the review-path message be reworded (item 1)? Is
-   the restriction mapping in §5 correct (for example, Extend and Flex counts as weight on hands, and lying
-   presses are allowed)?
-8. **`reassessment`, `timeline`**: should linking be limited to tests after week 4? Is a 4-week template with no
-   taper acceptable for release?
-9. **Disclaimers**: is the "general suggestion, not an Army-prescribed program" text and the start-plan
-   acknowledgement sufficient?
+- After a pain report, starting a new plan is still possible by ending the plan, recording a new AFT, and
+  starting a plan from the result page. Each of those routes goes through the health check's pain question.
+- Reassessment timing isn't enforced (see decision 4).
+- **Not tested:** screen readers (VoiceOver, NVDA), Safari and Firefox, and real phones.
+
+## Decisions for the reviewer
+
+These are RuckOn's current rules. None has professional approval. Each shows what the app does today, with
+examples from AFT-0003 (382, Pass), and the decision needed. The full decision table is in `review-package.md` §1.
+
+### 1. Progression when ratings are missing (`progressionGate`)
+
+**Now:** only recorded ratings can hold progression. If no session in weeks 1–2 is recorded, weeks 3–4 still
+"Build". For example, push-up practice goes from 3 to 4 sets for someone who logged nothing.
+
+**Decide:** should missing records hold progression, allow it, or require a minimum number of recorded sessions?
+
+### 2. "Hard" versus "Too hard" (`progressionGate`)
+
+**Now:** "Hard" never holds progression, even if every session is rated Hard. One "Too hard" rating holds every
+later week for the rest of the plan. For example, if week 1's strength session is rated Too hard and week 2's is
+Easy, weeks 3 and 4 both stay at the weeks 1–2 level. Pain does the same and also pauses the plan. Undoing the
+rating removes the hold.
+
+**Decide:** is a single "Too hard" the right trigger? Should repeated "Hard" ratings count? Should a hold ever
+end within the plan?
+
+### 3. Scheduling after manual rescheduling (`scheduling`)
+
+**Now:** the generated plan never puts hard sessions on consecutive days, but a user can move any session within
+its plan week. In the 4-day example (Tue easy run, Thu speed and SDC skills, Sat easy run, Mon strength):
+- moving the speed session to Sun Oct 25, next to Mon strength, is **allowed with a warning**;
+- moving it onto Sat Oct 24, where a run already is, is **refused**;
+- moving it outside week 1 is **refused**;
+- moving a session onto the AFT date is allowed with a warning.
+
+**Decide:** should back-to-back hard days after a move be blocked, allowed with a warning (current), or turn one
+session into recovery?
+
+### 4. Reassessment timing and taper (`reassessment`, `timeline`)
+
+**Now:** any saved test dated on or after the plan's start can be linked. In testing, a second test on the same
+day was accepted (+10 total). The app advises a practice AFT after week 4 but doesn't require it. There is no
+taper: with an AFT date inside the plan, sessions before it are unchanged, a session on the AFT day is flagged
+"skip it or move it", and sessions after it stay scheduled. The plan cites ATP 7-22.02 para 1-24 and refers the
+user to their H2F team.
+
+**Decide:** should linking be limited (for example, to tests after week 4)? Should a reviewed taper or test-week
+rule exist, or other plan lengths?
+
+### 5. Exercise substitutions for restrictions (`screening`, `pushAccessory`, §5)
+
+**Now:**
+
+| Restriction | What changes |
+|---|---|
+| Running | Runs become brisk walks; no 30:60 intervals or Shuttle Sprint |
+| Jumping | Jumping exercises such as High Jumper are skipped and named |
+| Lifting weights | No kettlebell, dumbbell, or barbell work; hinge practice uses Squat Bender and Back Bridge |
+| Weight on hands | Push-Up and Extend and Flex are skipped; a Supine Chest Press (kettlebells) or Bench Press replaces push-up practice, and the plan says it doesn't train the event. With push-ups as the only focus and no press possible (no equipment, or lifting restricted), no plan is made |
+| All four | No plan is made |
+
+**Decide:** approve each substitution and mapping. For example, is Extend and Flex "weight on the hands"? Is a
+lying press acceptable instead of push-ups? Are body-weight hinges enough when lifting is restricted?
+
+### 6. After a pain report (`screening`)
+
+**Now:** the plan pauses as described above. RuckOn sets no rule for resuming. The ways out are "Undo
+completion" on the session where pain was recorded (meant for mistaken entries), or ending the plan and starting
+a new one, which asks the pain question again.
+
+**Decide:** is the pause wording adequate? Should undoing a pain record be allowed, or should the plan stay
+paused? Should anything else be required before a new plan?
+
+### Also in `review-package.md`
+
+Loads and volumes (`loadedHinge`, `kettlebellCircuit`, `hrpPractice`, `plankPractice`, `intervals`), running caps
+(`runningCap`, `maintenanceRun`), session mix (`focus`, `sessionMix`; for example, AFT-0003 on 3 days gets no SDC
+session), time estimates (`durations`), and the disclaimers.
 
 Record decisions with the template in `docs/evaluation/05-training-content-review.md`, against the commit above.
