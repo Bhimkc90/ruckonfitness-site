@@ -70,6 +70,9 @@ export default function AftCalculator({ events, guides }: { events: CalculatorEv
   const [announcement, setAnnouncement] = useState("");
   const resultsHeading = useRef<HTMLHeadingElement>(null);
   const pendingFocus = useRef<"results" | "start" | null>(null);
+  // The Save button is replaced by its confirmation, so focus moves there instead of being lost.
+  const savedStatus = useRef<HTMLParagraphElement>(null);
+  const focusSaved = useRef(false);
 
   const defaults = calculatorDefaults(profile, entered.testDate || today || "");
   const { values, fromProfile } = applyCalculatorDefaults(entered, defaults, overridden);
@@ -92,6 +95,12 @@ export default function AftCalculator({ events, guides }: { events: CalculatorEv
     el?.focus({ preventScroll: true });
     el?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [calculation]);
+
+  useEffect(() => {
+    if (!savedId || !focusSaved.current) return;
+    focusSaved.current = false;
+    savedStatus.current?.focus();
+  }, [savedId]);
 
   const update = (field: keyof AftFormValues, value: string) => {
     setValues((current) => ({ ...current, [field]: value }));
@@ -122,6 +131,7 @@ export default function AftCalculator({ events, guides }: { events: CalculatorEv
   const saveResult = () => {
     if (!calculation || outdated || savedId) return;
     const saved = saveAftResult({ testDate: calculation.testDate, input: calculation.input, result: calculation.result });
+    focusSaved.current = true;
     if (saved.ok) setSave({ kind: "saved", id: saved.record.id });
     else if (saved.duplicate) setSave({ kind: "duplicate", id: saved.duplicate.id });
     else setSave({ kind: "error", message: saved.error });
@@ -338,7 +348,7 @@ export default function AftCalculator({ events, guides }: { events: CalculatorEv
 
             <div className="flex flex-col gap-3 border-t border-line pt-4 sm:flex-row sm:flex-wrap sm:items-start">
               {savedId ? (
-                <p role="status" className="flex items-start gap-2 text-sm font-medium text-ink sm:mr-auto">
+                <p ref={savedStatus} tabIndex={-1} role="status" className="flex items-start gap-2 text-sm font-medium text-ink sm:mr-auto">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-good" aria-hidden />
                   <span>
                     {save?.kind === "duplicate" ? "This exact test was already in your history, so it wasn't saved again." : "Saved to your history in this browser."}{" "}
