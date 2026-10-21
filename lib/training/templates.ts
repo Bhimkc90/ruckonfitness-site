@@ -1,7 +1,7 @@
 import type { ActivityId, RunningVolume } from "./types";
 
 // Version stored with every plan so later template changes never silently rewrite an active plan.
-export const TEMPLATE_VERSION = "starter-4wk-v3-draft (2026-10-20, not professionally reviewed)";
+export const TEMPLATE_VERSION = "starter-4wk-v4-draft (2026-10-20, not professionally reviewed)";
 
 // Citations used by the templates. Page numbers are the printed page numbers.
 export const S = {
@@ -36,6 +36,7 @@ export const S = {
   taper: "ATP 7-22.02 para 1-24, p. 1-9: the Army schedules testing after recovery or a taper",
   aftHrp: "ATP 7-22.01 (12 Mar 2026) paras 2-57 – 2-60, pp. 30–31: HRP standards",
   aftPlk: "ATP 7-22.01 (12 Mar 2026) para 2-73, p. 35: plank standards",
+  stcStepUp: "ATP 7-22.02 para 13-6, pp. 13-4 – 13-5: 8-Count Step-Up, Strength Training Circuit station 4, one minute",
 } as const;
 
 // Every rule RuckOn adds beyond the sources. Shown with each plan and listed for professional review.
@@ -43,7 +44,9 @@ export const ASSUMPTIONS = {
   focus:
     "Focus: failed events are developed; if none failed, the two lowest-scoring events are developed. Point gaps between events are not a validated way to divide training time.",
   sessionMix:
-    "Session mix: every week keeps one strength and one aerobic session for maintenance; extra days go to the focus events in priority order (deadlift, push-up, or plank → strength; 2-mile run → running; sprint-drag-carry → speed, then non-sprint SDC skills). With 4+ days a weekly speed session is kept; with 5 days one is a recovery session.",
+    "Session mix: every week keeps one strength and one aerobic session for maintenance; extra days first add any focus event's session type the week doesn't have yet, then follow the focus events in priority order (deadlift, push-up, or plank → strength; 2-mile run → running; sprint-drag-carry → speed, then non-sprint SDC skills). With 2 days: strength plus the highest-priority non-strength focus (speed for the SDC, otherwise an easy run). With 4+ days a weekly speed session is kept; with 5 days one is a recovery session.",
+  sdcStepUp:
+    "SDC leg strength: with kettlebells, sprint-drag-carry development adds the 8-Count Step-Up station to speed and conditioning sessions: 1-minute rounds with 60 seconds between, 2 rounds in weeks 1–2, then 3 in weeks 3–4. It is not drag or carry practice, and the ATP does not link it to the AFT.",
   maintenanceRun: "Maintenance runs are capped at 20 minutes; runs for a 2-mile run focus use the full per-run cap.",
   loadedHinge:
     "Loaded hinge: 8–10 reps (10–12 with dumbbells) at RPE 6–7 (3–4 reps in reserve) with 90 seconds' rest. Development: 2 sets in weeks 1–2, then 3 sets in weeks 3–4; maintenance stays at 2 sets. No maximum or percentage-based loads.",

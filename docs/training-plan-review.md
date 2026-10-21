@@ -8,7 +8,9 @@ AFT results (`lib/training/samples.ts`): a slow 2-mile run, a low deadlift, and 
 They are labeled as unreviewed examples, and personalized plans, starting plans, and tracking stay unavailable.
 
 A protected reviewer Preview with plans enabled (Preview environment only) is described in
-`docs/training-review/preview.md`, with access instructions, verification screenshots, and open questions.
+`docs/training-review/preview.md`, with access instructions, verification screenshots, and open questions. Its
+`/training-plan/scenarios` page shows a synthetic baseline for every AFT failure pattern. Coverage of each pattern,
+and what is still pending, is in `docs/training-review/failure-patterns.md`.
 
 To preview the full personalized flow locally:
 
@@ -25,7 +27,7 @@ into a plan for any self-selected user are RuckOn assumptions. They need review 
 professional, such as an H2F strength and conditioning coach or athletic trainer, with physical therapy
 input for the screening items.
 
-Template version: `starter-4wk-v3-draft` (`lib/training/templates.ts`, `TEMPLATE_VERSION`). Plans already saved
+Template version: `starter-4wk-v4-draft` (`lib/training/templates.ts`, `TEMPLATE_VERSION`). Plans already saved
 keep the version and prescriptions they were created with.
 
 **Exact prescriptions for sign-off:** `docs/training-review/review-package.md`. It is generated from the engine by
@@ -40,7 +42,7 @@ Each item is in `ASSUMPTIONS` in `lib/training/templates.ts` and is shown to use
 | # | Area | Current rule | Question for the reviewer |
 |---|------|--------------|---------------------------|
 | 1 | Focus | Failed events are developed; otherwise the two lowest-scoring events (ties included, balanced when more than three tie or all score 100). | Is ordering emphasis by points appropriate, and is two the right number? |
-| 1a | Session mix | Each week keeps one strength and one aerobic session; extra days go to focus events in priority order (deadlift/push-up/plank → strength, 2-mile run → running, SDC → speed, then a non-sprint SDC skills session). With 4+ days a weekly speed session is kept; with 5 days one is recovery. Two-day plans are strength plus running (or speed when the SDC is the top priority). | Is this allocation sensible for each weakness profile, and should any profile get a different mix? |
+| 1a | Session mix (changed in v4) | Each week keeps one strength and one aerobic session; extra days first add any focus event's session type the week lacks, then follow priority order (deadlift/push-up/plank → strength, 2-mile run → running, SDC → speed, then a non-sprint SDC skills session). With 4+ days a weekly speed session is kept; with 5 days one is recovery. Two-day plans are strength plus the highest-priority non-strength focus (speed for the SDC, otherwise running). A failed event without a session is named in the plan's limits. | Is this allocation sensible for each weakness profile, and should any profile get a different mix? |
 | 1b | Maintenance running | Runs for a maintained 2-mile run are capped at 20 minutes; a 2-mile run focus uses the full per-run cap for the reported range. | Is 20 minutes an appropriate maintenance ceiling? |
 | 2 | Loaded hinge (barbell, hex bar, dumbbells) | 2 sets (weeks 1–2), then 3 sets (weeks 3–4) × 8–10 reps (10–12 with dumbbells) at RPE 6–7 (3–4 reps in reserve), 90 s rest. No maximum or percentage loads. | Are the volume, effort, and rest suitable for untrained and trained users with no coaching? |
 | 3 | Kettlebell stations | Strength Training Circuit stations 1–2 (Sumo Squat, Straight-Leg Deadlift): 2 rounds, then 3 rounds of 1 minute, 60 s between rounds. | Is the progression suitable? The ATP lets Soldiers adjust the weight but gives no starting load. |
@@ -56,6 +58,8 @@ Each item is in `ASSUMPTIONS` in `lib/training/templates.ts` and is shown to use
 
 | 13 | Push accessory (new in v3) | Push-up development adds a loaded press when equipment allows and lifting isn't restricted: Supine Chest Press station with kettlebells (2, then 3 rounds of 1 minute; ATP 7-22.02 para 13-9) or Bench Press with a barbell or dumbbells (2, then 3 sets of 8–10 at RPE 6–7, 90 s rest, with a spotter; para 14-10, 14-12). With the weight-on-hands restriction the press replaces push-up practice, and the plan says it doesn't train the event. | Is a press appropriate for push-up development, and as a substitute when weight on the hands is restricted? |
 | 14 | Plan length and timeline (new in v3) | Only a 4-week template exists. The AFT date shows the time available. If the AFT is sooner than 4 weeks, the plan is not shortened and no workload is added; sessions on or after the AFT date stay scheduled for afterward, and a session on the AFT day is flagged. | Should other reviewed plan lengths exist (for example 2 or 6 weeks), and what should happen when a test is sooner? |
+| 15 | SDC leg strength (new in v4) | With kettlebells, SDC development adds the 8-Count Step-Up station (ATP 7-22.02 para 13-6) to speed and conditioning sessions: 2, then 3 rounds of 1 minute, 60 s between rounds. It is not drag or carry practice; the library has none. | Is the Step-Up appropriate, at this dose, in the same session as sprinting? |
+| 16 | Failure-pattern pathways (new in v4) | Each plan records its pattern (none, single, pair, 3+, total only) and a status. Three or more failures show the plan but can't start it until workload scaling is decided. See `docs/training-review/failure-patterns.md`. | The pathway decisions in `review-package.md` §7. |
 
 ## Status of the flow (5 Oct 2026)
 

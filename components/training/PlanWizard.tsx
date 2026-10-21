@@ -27,6 +27,7 @@ import { ButtonLink, buttonClass } from "@/components/ui/Button";
 import { PassFailBadge } from "@/components/ui/StatusBadge";
 import { PlanDisclaimer, useToday } from "./PlanParts";
 import PlanPreview from "./PlanPreview";
+import { PATHWAY_DECISIONS, canStartPlan } from "@/lib/training/pathways";
 import { equipmentOptions, experienceOptions, restrictionOptions, runningOptions } from "@/lib/training/options";
 import { inputClass } from "@/components/ui/form";
 
@@ -118,7 +119,7 @@ export default function PlanWizard() {
   const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
   const handleStart = () => {
-    if (outcome.status !== "ready") return;
+    if (outcome.status !== "ready" || !canStartPlan(outcome.plan)) return;
     const result = updateTrainingData((data) =>
       startPlan(data, outcome.plan, { id: crypto.randomUUID(), createdAt: new Date().toISOString(), startDate: start })
     );
@@ -433,6 +434,22 @@ export default function PlanWizard() {
               <>
                 <PlanDisclaimer />
                 <PlanPreview plan={outcome.plan} startDate={start} />
+                {!canStartPlan(outcome.plan) ? (
+                  <Card title="This plan can't be started yet">
+                    <p className="text-sm text-ink">
+                      {outcome.plan.pathway!.statusReasons[0]} The schedule above shows what the draft templates would produce, for review only.
+                    </p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink-2">
+                      {outcome.plan.pathway!.decisions
+                        .filter((id) => id === "multiple-workload")
+                        .map((id) => (
+                          <li key={id}>Waiting for review decision: {PATHWAY_DECISIONS[id].decide}</li>
+                        ))}
+                    </ul>
+                    <p className="mt-2 text-sm text-ink">Share your AFT result with a coach or your unit&apos;s H2F team for a program that fits.</p>
+                    <StepButtons back={back} />
+                  </Card>
+                ) : (
                 <Card title="Start the plan">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="block text-sm">
@@ -466,6 +483,7 @@ export default function PlanWizard() {
                     )}
                   </div>
                 </Card>
+                )}
               </>
             )}
           </div>

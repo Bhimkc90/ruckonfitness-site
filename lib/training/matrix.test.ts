@@ -169,6 +169,34 @@ describe("documented rules hold across the input matrix", () => {
   });
 });
 
+describe("documented rules hold for every failure pattern", () => {
+  const PASS = { MDL: 250, HRP: 40, SDC: t(1, 50), PLK: t(2, 30), "2MR": t(16, 30) };
+  const FAIL = { MDL: 120, HRP: 8, SDC: t(3, 30), PLK: t(0, 50), "2MR": t(24, 0) };
+  const events = ["MDL", "HRP", "SDC", "PLK", "2MR"] as const;
+  const patterns: [string, BaselineSnapshot][] = Array.from({ length: 32 }, (_, mask) => {
+    const failed = events.filter((_, i) => mask & (1 << i));
+    return [failed.join("+") || "none", baseline(Object.fromEntries(events.map((e) => [e, failed.includes(e) ? FAIL[e] : PASS[e]])))];
+  });
+  const combatTotalOnly: AftInput = { age: 25, standard: "combat", gender: "M", raw: { MDL: 200, HRP: 25, SDC: t(2, 20), PLK: t(1, 40), "2MR": t(19, 30) } };
+  patterns.push(["combat total only", { resultId: "r1", testDate: "2026-09-01", input: combatTotalOnly, result: scoreAft(combatTotalOnly) }]);
+
+  it("all 32 pass/fail patterns and a total-only failure, across schedules, lengths, equipment, restrictions, and running", () => {
+    const failures: string[] = [];
+    const schedules: WeekdayId[][] = [["tue", "sat"], ["mon", "wed", "fri"], ["mon", "tue", "thu", "sat"], ["mon", "tue", "wed", "fri", "sat"]];
+    for (const [name, b] of patterns)
+      for (const weekdays of schedules)
+        for (const sessionMinutes of [30, 45, 60] as const)
+          for (const equipment of EQUIPMENT)
+            for (const restrictions of [[], ...RESTRICTIONS.map((r) => [r])] as Restriction[][])
+              for (const recentRunning of ["none", "61-120"] as RunningVolume[]) {
+                const p = prefs({ daysPerWeek: weekdays.length as Preferences["daysPerWeek"], weekdays, sessionMinutes, equipment, restrictions, recentRunning, experience: recentRunning === "none" ? "new" : "some" });
+                const v = violations(p, b, "2026-10-05");
+                if (v.length) failures.push(`${name} ${weekdays.join(",")} ${sessionMinutes} [${equipment}] [${restrictions}] ${recentRunning}: ${v.join("; ")}`);
+              }
+    expect(failures.slice(0, 20)).toEqual([]);
+  });
+});
+
 describe("progression gate and reassessment edge cases", () => {
   const outcome = generatePlan({ baseline: BASELINES.slowRun, prefs: prefs({}), screening: { currentPain: false, otherInstructions: "" }, startDate: "2026-10-05" });
   if (outcome.status !== "ready") throw new Error(outcome.status);

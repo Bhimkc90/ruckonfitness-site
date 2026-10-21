@@ -1,5 +1,6 @@
 import type { AftEventCode, AftInput, AftResult } from "@/lib/aft/types";
 import type { DrillId } from "@/lib/library/types";
+import type { PlanPathway } from "./pathways";
 
 export type WeekdayId = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 export type Experience = "new" | "some" | "regular";
@@ -115,6 +116,8 @@ export type Timeline = {
 
 export type PlanDraft = {
   templateVersion: string;
+  // The AFT failure pattern and how far the templates cover it. Absent on plans saved before v4.
+  pathway?: PlanPathway;
   baseline: BaselineSnapshot;
   preferences: Preferences;
   analysis: EventAnalysis[];

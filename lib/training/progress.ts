@@ -74,6 +74,14 @@ export function progressionHeld(plan: StoredPlan, completions: SessionCompletion
   return completions.some((c) => c.planId === plan.id && earlier.has(c.sessionId) && (c.pain || c.difficulty === "too-hard"));
 }
 
+// How many sessions before a week were recorded. Missing records only fail to hold progression under the current
+// rule; they are never evidence that the person is ready for more (docs/training-review/preview.md, decision 1).
+export function earlierRecords(plan: StoredPlan, completions: SessionCompletion[], week: number): { recorded: number; total: number } {
+  const earlier = plan.sessions.filter((s) => s.week < week);
+  const done = planCompletions(plan, completions);
+  return { recorded: earlier.filter((s) => done.has(s.id)).length, total: earlier.length };
+}
+
 export function currentWeek(plan: StoredPlan, today: string): number {
   for (let week = 1; week <= PLAN_WEEKS; week++) {
     if (today <= weekWindow(plan.startDate, week).to) return week;

@@ -2,6 +2,7 @@ import type {
   AftEventCode,
   AftInput,
   AftResult,
+  AftStandard,
   AgeGroup,
   EventScoreResult,
   Gender,
@@ -102,6 +103,21 @@ export function getScoreColumn(input: Pick<AftInput, "standard" | "gender">): Ge
   return input.gender;
 }
 
+// The pass rules for one scoring category. Training plans read failures through these, so they never
+// re-derive the thresholds.
+export function meetsEventMinimum(points: number, standard: AftStandard): boolean {
+  return points >= aftStandardRules[standard].minEventPoints;
+}
+
+export function meetsTotalMinimum(total: number, standard: AftStandard): boolean {
+  return total >= aftStandardRules[standard].minTotalPoints;
+}
+
+// Events below the minimum, in event order.
+export function failedEvents(result: Pick<AftResult, "events" | "standard">): AftEventCode[] {
+  return result.events.filter((e) => !meetsEventMinimum(e.points, result.standard)).map((e) => e.event);
+}
+
 export function scoreAft(input: AftInput): AftResult {
   if (!Number.isInteger(input.age) || input.age < MIN_AFT_AGE) {
     throw new Error(`Age must be a whole number of at least ${MIN_AFT_AGE}.`);
@@ -120,13 +136,13 @@ export function scoreAft(input: AftInput): AftResult {
   const total = events.reduce((sum, item) => sum + item.points, 0);
 
   const failReasons = events
-    .filter((item) => item.points < rule.minEventPoints)
+    .filter((item) => !meetsEventMinimum(item.points, input.standard))
     .map(
       (item) =>
         `${aftEventInfo[item.event].name} is below ${rule.minEventPoints} points (${item.points}).`
     );
 
-  if (total < rule.minTotalPoints) {
+  if (!meetsTotalMinimum(total, input.standard)) {
     failReasons.push(`Total is below ${rule.minTotalPoints} points (${total}).`);
   }
 

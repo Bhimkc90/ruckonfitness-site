@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { TRAINING_PLANS_ENABLED } from "@/lib/features";
+import Link from "next/link";
+import { TRAINING_PLANS_ENABLED, TRAINING_SCENARIOS_ENABLED } from "@/lib/features";
 import PlanView from "@/components/training/PlanView";
 import UnderReview from "@/components/training/UnderReview";
 
@@ -9,5 +10,19 @@ export const metadata: Metadata = {
 };
 
 export default function TrainingPlanPage() {
-  return TRAINING_PLANS_ENABLED ? <PlanView /> : <UnderReview />;
+  if (!TRAINING_PLANS_ENABLED) return <UnderReview />;
+  return (
+    <>
+      <PlanView />
+      {TRAINING_SCENARIOS_ENABLED && (
+        <p className="mt-6 text-sm text-ink-2">
+          Reviewing the templates?{" "}
+          <Link href="/training-plan/scenarios" className="font-medium text-accent-ink underline underline-offset-2">
+            Open the synthetic failure-pattern scenarios
+          </Link>{" "}
+          (Preview only; nothing is saved).
+        </p>
+      )}
+    </>
+  );
 }

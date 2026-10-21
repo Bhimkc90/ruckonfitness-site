@@ -10,6 +10,7 @@ import { planProgression } from "@/lib/training/progression";
 import { Card } from "@/components/ui/Card";
 import { Chip, PassFailBadge } from "@/components/ui/StatusBadge";
 import { BlockView } from "./PlanParts";
+import PathwayCard from "./PathwayCard";
 
 export function FocusCard({ plan, sample = false }: { plan: PlanDraft; sample?: boolean }) {
   const { baseline } = plan;
@@ -197,14 +198,15 @@ export function SessionBody({
   );
 }
 
-export default function PlanPreview({ plan, startDate }: { plan: PlanDraft; startDate: string }) {
+export default function PlanPreview({ plan, startDate, openDecisions = false }: { plan: PlanDraft; startDate: string; openDecisions?: boolean }) {
   return (
     <div className="space-y-5">
+      {plan.pathway && <PathwayCard pathway={plan.pathway} openDecisions={openDecisions} />}
       <div className="grid gap-5 lg:grid-cols-2 [&>*]:min-w-0">
         <FocusCard plan={plan} />
         <NotesCard plan={plan} />
       </div>
-      <Card title="Four-week schedule" description="Weeks 1–2 build the foundation; weeks 3–4 add a little volume if the earlier weeks went well.">
+      <Card title="Four-week schedule" description="Weeks 1–2 build the foundation; weeks 3–4 add a little volume unless an earlier session is rated too hard or painful. Unrecorded sessions don’t count as readiness.">
         <div className="space-y-4">
           {Array.from({ length: PLAN_WEEKS }, (_, i) => i + 1).map((week) => (
             <details key={week} open={week === 1} className="rounded-lg border border-line p-3">

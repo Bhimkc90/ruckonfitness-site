@@ -1,11 +1,12 @@
 import type { AftEventCode } from "@/lib/aft/types";
-import { aftEventInfo, aftEventOrder } from "@/lib/aft/scoring";
+import { aftEventInfo, aftEventOrder, meetsEventMinimum } from "@/lib/aft/scoring";
 import { aftStandardRules } from "@/lib/aft/rules";
 import { describeCategory, formatRaw } from "@/lib/aft/format";
 import { formatSeconds } from "@/lib/aft/validation";
 import { getDrill, getExercise } from "@/lib/library";
 import type { DrillId } from "@/lib/library/types";
 import { ASSUMPTIONS, CONDENSED_PD, MINUTES, PLAN_WEEKS, S, TEMPLATE_VERSION, runningLimits } from "./templates";
+import { describePathway } from "./pathways";
 import type {
   BaselineSnapshot,
   EventAnalysis,
@@ -52,7 +53,7 @@ export function analyzeBaseline(baseline: BaselineSnapshot): {
   const rule = aftStandardRules[result.standard];
   const events = aftEventOrder.map((event) => {
     const entry = result.events.find((e) => e.event === event)!;
-    return { event, points: entry.points, raw: entry.raw, passed: entry.points >= rule.minEventPoints };
+    return { event, points: entry.points, raw: entry.raw, passed: meetsEventMinimum(entry.points, result.standard) };
   });
   const byPoints = (list: typeof events) => [...list].sort((a, b) => a.points - b.points || aftEventOrder.indexOf(a.event) - aftEventOrder.indexOf(b.event));
 
@@ -438,6 +439,27 @@ function intervalsBlock(ctx: Ctx): PlanBlock {
   };
 }
 
+// Leg strength for sprint-drag-carry development: the Step-Up station at the existing kettlebell station dose.
+// It is not drag or carry practice, which the library doesn't have.
+function sdcStepUpBlock(ctx: Ctx): PlanBlock | null {
+  if (ctx.roles.SDC !== "develop" || !ctx.prefs.equipment.includes("kettlebell") || !exerciseAllowed("step-up", ctx.restrictions)) return null;
+  const p = (rounds: string): Prescription => ({
+    sets: rounds,
+    time: "1 minute",
+    rest: "60 seconds between rounds",
+    intensity: "Kettlebells you can hold at your sides with control for the whole minute; rest or lighten them if form slips",
+    notes: "Needs a 12–18 inch step",
+  });
+  return {
+    id: "sdc-step-up",
+    title: "SDC leg strength: Step-Up station",
+    minutes: 5,
+    items: [{ kind: "exercise", exerciseId: "step-up", prescription: { foundation: p("2 rounds"), build: p("3 rounds") } }],
+    sources: [S.stcStepUp, S.stc, S.kettlebells],
+    assumptions: [ASSUMPTIONS.sdcStepUp],
+  };
+}
+
 function conditioningBlock(ctx: Ctx): PlanBlock | null {
   const items: PlanItem[] = [];
   for (const drillId of ["conditioning-drill-1", "conditioning-drill-2"] as DrillId[]) {
@@ -527,26 +549,28 @@ function buildSession(kind: SessionKind, ctx: Ctx, runMinutes: number, variant =
   }
 
   if (kind === "speed") {
-    const main = fitBlocks([mmd1Block(ctx, true), intervalsBlock(ctx)].filter((b): b is PlanBlock => b !== null), budget, () => undefined);
+    const skipped: string[] = [];
+    const main = fitBlocks([mmd1Block(ctx, true), intervalsBlock(ctx), sdcStepUpBlock(ctx)].filter((b): b is PlanBlock => b !== null), budget, (b) => skipped.push(b.title));
     return {
       title: "Speed and SDC skills",
       purpose: `Movement drills and sprint intervals for the sprint-drag-carry${ctx.roles.SDC === "develop" ? " (a development focus)" : ""}. The Army schedules speed running at least once a week.`,
       warmUp,
       main,
       recovery,
-      skipped: [],
+      skipped,
     };
   }
 
   if (kind === "conditioning") {
-    const main = fitBlocks([mmd1Block(ctx, false), conditioningBlock(ctx)].filter((b): b is PlanBlock => b !== null), budget, () => undefined);
+    const skipped: string[] = [];
+    const main = fitBlocks([mmd1Block(ctx, false), conditioningBlock(ctx), sdcStepUpBlock(ctx)].filter((b): b is PlanBlock => b !== null), budget, (b) => skipped.push(b.title));
     return {
       title: "Conditioning drills",
-      purpose: "Body-weight conditioning and lateral movement without sprinting.",
+      purpose: `Body-weight conditioning and lateral movement without sprinting${ctx.roles.SDC === "develop" ? ", for sprint-drag-carry skills (a development focus)" : ""}.`,
       warmUp,
       main,
       recovery,
-      skipped: [],
+      skipped,
     };
   }
 
@@ -619,14 +643,19 @@ function permutations<T>(items: T[]): T[][] {
   return result;
 }
 
+export function sessionKindFor(event: AftEventCode, speedPossible: boolean): SessionKind {
+  return event === "2MR" ? "endurance" : event === "SDC" ? (speedPossible ? "speed" : "conditioning") : "strength";
+}
+
 // Session mix for one week. Every week keeps one strength and one aerobic session so stronger events are
-// maintained; the remaining days follow the focus events in priority order.
+// maintained; the remaining days go first to any focus event's session type the week doesn't have yet, so each
+// failed event gets a session when the days allow, then follow the focus events in priority order.
 export function weeklyKinds(days: number, speedPossible: boolean, priorities: AftEventCode[]): SessionKind[] {
   const speed: SessionKind = speedPossible ? "speed" : "conditioning";
-  const kindFor = (event: AftEventCode): SessionKind => (event === "2MR" ? "endurance" : event === "SDC" ? speed : "strength");
-  const focusKinds = Array.from(new Set(priorities.map(kindFor)));
+  const focusKinds = Array.from(new Set(priorities.map((e) => sessionKindFor(e, speedPossible))));
 
-  if (days === 2) return ["strength", focusKinds[0] === speed ? speed : "endurance"];
+  // Two days: strength plus the highest-priority focus that isn't strength, or an easy run.
+  if (days === 2) return ["strength", focusKinds.find((k) => k !== "strength") === speed ? speed : "endurance"];
 
   const kinds: SessionKind[] = ["strength", "endurance"];
   let slots = days - 2;
@@ -638,9 +667,10 @@ export function weeklyKinds(days: number, speedPossible: boolean, priorities: Af
     kinds.push(speed); // weekly speed running (ATP 7-22.02 para 1-24)
     slots--;
   }
+  const missing = focusKinds.filter((k) => !kinds.includes(k));
   const cycle: SessionKind[] = focusKinds.length ? focusKinds : days >= 4 ? ["strength", "endurance"] : [speed];
   for (let i = 0; i < slots; i++) {
-    let kind = cycle[i % cycle.length];
+    let kind = i < missing.length ? missing[i] : cycle[(i - missing.length) % cycle.length];
     // A second SDC session practices SDC skills without sprinting.
     if (kind === "speed" && kinds.includes("speed")) kind = "conditioning";
     kinds.push(kind);
@@ -966,6 +996,22 @@ export function generatePlan(input: {
     if (!included.has(title)) ctx.limitations.add(`${title} does not fit in a ${prefs.sessionMinutes}-minute session with your other priorities; longer sessions would allow it.`);
   }
 
+  // Every failed event should be trained by something in the week; say so when the chosen days don't allow it.
+  const mainIds = bodies.flatMap((b) => b.main.map((block) => block.id));
+  const trains: Record<AftEventCode, boolean> = {
+    MDL: mainIds.some((id) => id.startsWith("mdl")),
+    HRP: mainIds.some((id) => id.startsWith("hrp")),
+    PLK: mainIds.some((id) => id.startsWith("plk")),
+    SDC: kinds.includes("speed") || kinds.includes("conditioning"),
+    "2MR": kinds.includes("endurance"),
+  };
+  const uncoveredFailed = analysis.filter((a) => !a.passed && !trains[a.event]).map((a) => a.event);
+  for (const event of uncoveredFailed) {
+    ctx.limitations.add(
+      `${aftEventInfo[event].name}: it is below the minimum but has no session with ${prefs.daysPerWeek} training days and your other priorities. More days would add one.`
+    );
+  }
+
   const sessions: PlanSession[] = [];
   for (let week = 1; week <= PLAN_WEEKS; week++) {
     days.forEach((weekday, i) => {
@@ -1013,9 +1059,19 @@ export function generatePlan(input: {
     : "After week 4, record a practice AFT with a trained grader and link it to this plan to compare it with the baseline. Then create a new plan from that result. Army program design relies on follow-up assessments.";
 
   const rationale = explainSessions({ kinds, priorities, roles, ctx, runMinutes, speedPossible });
+  const pathway = describePathway(baseline.result, {
+    focusEvents: priorities,
+    uncoveredFailed,
+    loadedHinge: mainIds.some((id) => id === "mdl-deadlift" || id === "mdl-kettlebell" || id === "mdl-dumbbell"),
+    hrpPressOnly: restrictions.has("no-weight-on-hands") && mainIds.some((id) => id.startsWith("hrp")),
+    speedPossible,
+    runAllowed: ctx.runAllowed,
+    stepUp: mainIds.includes("sdc-step-up"),
+  });
 
   const plan: PlanDraft = {
     templateVersion: TEMPLATE_VERSION,
+    pathway,
     baseline,
     preferences: prefs,
     analysis,

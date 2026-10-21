@@ -88,7 +88,7 @@ export default function SamplePlans({ samples }: { samples: SamplePlan[] }) {
 
       <Card
         title="Week 1 sample sessions"
-        description="Weeks 1–2 use these foundation prescriptions; weeks 3–4 add a little volume only if earlier sessions went well and no pain was reported."
+        description="Weeks 1–2 use these foundation prescriptions; weeks 3–4 add a little volume unless an earlier session was rated too hard or painful."
         action={<PreviewLabel />}
       >
         <ul className="space-y-3">

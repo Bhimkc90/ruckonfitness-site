@@ -5,6 +5,9 @@ import { PAIN_MESSAGE, generatePlan } from "./engine";
 import { ASSUMPTIONS, MINUTES, PLAN_WEEKS, SUPPORTED_PLAN_WEEKS, TEMPLATE_VERSION, runningLimits, type AssumptionId } from "./templates";
 import { itemName } from "./progression";
 import { buildSamplePlans } from "./samples";
+import { PATHWAY_DECISIONS, pathwayStatusLabels, type PathwayDecisionId } from "./pathways";
+import { DEFAULT_SCENARIO_PREFS, SCENARIOS, SCENARIO_START, scenarioBaseline } from "./scenarios";
+import { aftEventInfo } from "@/lib/aft/scoring";
 import type { BaselineSnapshot, DaysPerWeek, EquipmentOption, PlanBlock, PlanItem, Preferences, Prescription, Restriction, RunningVolume, SessionMinutes, WeekdayId } from "./types";
 
 // Builds docs/training-review/review-package.md from the engine itself, so the prescriptions a reviewer signs
@@ -196,9 +199,35 @@ export function buildReviewPackage(): string {
     "- Any written instruction or profile detail: no plan; the user is directed to their provider or unit H2F team.",
     "- All four restrictions together, or a push-up-only focus with no weight on the hands and no press available: no plan, with an explanation.",
     "",
-    "## 7. Example plans (week 1, synthetic baselines)",
-    ""
+    "## 7. Failure-pattern pathways",
+    "",
+    "Every scenario on the reviewer page (`/training-plan/scenarios`), with its default preferences (3 days: Monday, Wednesday,",
+    "Friday; 45 minutes; kettlebells; a place to run; some experience; 31–60 minutes of recent running; no restrictions,",
+    "unless the scenario says otherwise). Failures come from the scoring engine. *Draft available* means the plan uses",
+    "only the existing draft templates; *Partial* means part of the emphasis can't be delivered; *Pending review* means",
+    "the structure is shown but the plan can't be started.",
+    "",
+    "| Scenario | Points (MDL/HRP/SDC/PLK/2MR = total) | Pathway | Status | Focus | Week 1 | Open decisions |",
+    "|---|---|---|---|---|---|---|"
   );
+  for (const scenario of SCENARIOS) {
+    const b = scenarioBaseline(scenario);
+    const out = generatePlan({ baseline: b, prefs: { ...DEFAULT_SCENARIO_PREFS, ...scenario.prefs }, screening: { currentPain: false, otherInstructions: "" }, startDate: SCENARIO_START });
+    if (out.status !== "ready") {
+      push(`| ${scenario.label} | | | ${out.status} | | | |`);
+      continue;
+    }
+    const pw = out.plan.pathway!;
+    const week1 = out.plan.sessions.filter((x) => x.week === 1).map((x) => x.title.replace(/ \([AB]\)$/, "")).join("; ");
+    push(
+      `| ${scenario.label} | ${b.result.events.map((e) => e.points).join("/")} = ${b.result.total} | \`${pw.id}\` | ${pathwayStatusLabels[pw.status]} | ${pw.focusEvents.map((e) => aftEventInfo[e].shortName).join(", ") || "none"} | ${week1} | ${pw.decisions.map((d) => `\`${d}\``).join(", ")} |`
+    );
+  }
+  push("", "### Pathway decisions", "", "| ID | Now | Decide | Decision |", "|---|---|---|---|");
+  for (const [id, d] of Object.entries(PATHWAY_DECISIONS) as [PathwayDecisionId, (typeof PATHWAY_DECISIONS)[PathwayDecisionId]][]) {
+    push(`| \`${id}\` | ${d.now} | ${d.decide} | ☐ approve ☐ change ☐ reject |`);
+  }
+  push("", "## 8. Example plans (week 1, synthetic baselines)", "");
   for (const sample of buildSamplePlans()) {
     push(`### ${sample.label}`, "", sample.profile, "", ...sample.preferences.map((p) => `- ${p}`), "");
     for (const s of sample.plan.sessions.filter((x) => x.week === 1)) {

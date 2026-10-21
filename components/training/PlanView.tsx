@@ -28,6 +28,7 @@ import {
   nextSession,
   planCompletions,
   progressionHeld,
+  earlierRecords,
   reassessmentCandidates,
   sessionsByDate,
 } from "@/lib/training/progress";
@@ -202,6 +203,7 @@ function ActivePlan({ plan, completions, today, results }: { plan: StoredPlan; c
 
       {Array.from({ length: PLAN_WEEKS }, (_, i) => i + 1).map((w) => {
         const held = progressionHeld(plan, completions, w);
+        const records = earlierRecords(plan, completions, w);
         const range = weekWindow(plan.startDate, w);
         return (
           <section key={w} aria-labelledby={`week-${w}`} className="rounded-xl border border-card-line bg-surface shadow-sm p-4 sm:p-5">
@@ -217,6 +219,13 @@ function ActivePlan({ plan, completions, today, results }: { plan: StoredPlan; c
               <p className="mt-2 flex gap-1.5 text-xs text-ink-2">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
                 An earlier session was rated too hard or painful, so this week repeats the week 1–2 workload.
+              </p>
+            )}
+            {w >= 3 && !held && records.recorded < records.total && (
+              <p className="mt-2 flex gap-1.5 text-xs text-ink-2">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                {records.recorded} of {records.total} earlier sessions are recorded. The build level is shown because no recorded session was
+                rated too hard or painful; sessions without a record don&apos;t show that you&apos;re ready for more. This rule is waiting for review.
               </p>
             )}
             <ul className="mt-3 space-y-3">
