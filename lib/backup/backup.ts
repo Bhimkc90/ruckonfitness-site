@@ -3,10 +3,11 @@ import { MIN_AFT_AGE, scoreAft } from "@/lib/aft/scoring";
 import { aftScoringFile } from "@/lib/aft/scoringFile";
 import { RAW_LIMITS, isWithin as inRange } from "@/lib/aft/limits";
 import { AFT_RESULTS_SCHEMA_VERSION, findDuplicate, isSavedResult, type SavedAftResult } from "@/lib/storage/aftResults";
-import { TRAINING_SCHEMA_VERSION, parseTrainingData, type TrainingData } from "@/lib/storage/trainingPlans";
+import { LEGACY_TRAINING_SCHEMA_VERSIONS, TRAINING_SCHEMA_VERSION, parseTrainingData, type TrainingData } from "@/lib/storage/trainingPlans";
+import { checkWorkoutData } from "@/lib/storage/workoutRecords";
 import { parseProfile, type SoldierProfile } from "@/lib/profile/profile";
 import { parseSettingsValue, type AppSettings } from "@/lib/settings/settings";
-import type { StoredPlan } from "@/lib/training/types";
+import type { SessionCompletion, SetCompletion, StoredPlan, StoredWorkout, WorkoutPainReport } from "@/lib/training/types";
 
 // Versioned backup of everything RuckOn stores in this browser. Each section keeps its own storage schema,
 // so a backup restores exactly what was saved: scoring snapshots, plan baselines, and completion records.
@@ -145,6 +146,11 @@ function validPlan(plan: StoredPlan): boolean {
   );
 }
 
+const DIFFICULTIES = ["easy", "about-right", "hard", "too-hard"];
+function validCompletion(c: SessionCompletion): boolean {
+  return isTimestamp(c.completedAt) && DIFFICULTIES.includes(c.difficulty) && typeof c.pain === "boolean" && typeof c.notes === "string" && c.notes.length <= 500;
+}
+
 export type BackupValidation = { ok: true; backup: Backup; data: LocalData } | { ok: false; error: string };
 
 // Rejects anything that isn't a complete, supported RuckOn backup. Nothing is partially accepted.
@@ -178,15 +184,22 @@ export function validateBackup(text: string): BackupValidation {
   const results = aft.results as SavedAftResult[];
   if (new Set(results.map((r) => r.id)).size !== results.length) return { ok: false, error: "The AFT history contains repeated record IDs." };
 
-  // Training plans and completions
+  // Training plans and completions. Schema 1 backups (before tracked workouts) are upgraded with no workout
+  // records; schema 2 must carry all three workout lists.
   const tp = data.trainingPlans;
-  if (!isObject(tp) || tp.schemaVersion !== TRAINING_SCHEMA_VERSION || !Array.isArray(tp.plans) || !Array.isArray(tp.completions)) {
+  const legacy = isObject(tp) && (LEGACY_TRAINING_SCHEMA_VERSIONS as readonly unknown[]).includes(tp.schemaVersion);
+  if (!isObject(tp) || !(legacy || tp.schemaVersion === TRAINING_SCHEMA_VERSION) || !Array.isArray(tp.plans) || !Array.isArray(tp.completions)) {
     return { ok: false, error: "The training-plan section uses an unsupported format." };
+  }
+  const workoutLists = legacy ? { workouts: [], setRecords: [], painReports: [] } : { workouts: tp.workouts, setRecords: tp.setRecords, painReports: tp.painReports };
+  if (!Array.isArray(workoutLists.workouts) || !Array.isArray(workoutLists.setRecords) || !Array.isArray(workoutLists.painReports)) {
+    return { ok: false, error: "The training-plan section is missing its workout records." };
   }
   const training = parseTrainingData(JSON.stringify(tp));
   if (training.plans.length !== tp.plans.length || training.completions.length !== tp.completions.length || !training.plans.every(validPlan)) {
     return { ok: false, error: "The training-plan section contains incomplete or invalid records." };
   }
+  if (!training.completions.every(validCompletion)) return { ok: false, error: "The training-plan section contains incomplete or invalid records." };
   if (new Set(training.plans.map((p) => p.id)).size !== training.plans.length) return { ok: false, error: "The training plans contain repeated plan IDs." };
   if (training.plans.filter((p) => p.status === "active").length > 1) return { ok: false, error: "The backup has more than one active training plan." };
   const keys = new Set<string>();
@@ -199,6 +212,14 @@ export function validateBackup(text: string): BackupValidation {
     if (keys.has(key)) return { ok: false, error: "A workout is recorded as completed more than once." };
     keys.add(key);
   }
+  const workoutProblem = checkWorkoutData(workoutLists as { workouts: unknown[]; setRecords: unknown[]; painReports: unknown[] }, training.plans, training.completions);
+  if (workoutProblem) return { ok: false, error: workoutProblem };
+  const restoredTraining: TrainingData = {
+    ...training,
+    workouts: workoutLists.workouts as StoredWorkout[],
+    setRecords: workoutLists.setRecords as SetCompletion[],
+    painReports: workoutLists.painReports as WorkoutPainReport[],
+  };
 
   // Profile and settings: must survive strict parsing unchanged.
   let profile: SoldierProfile | null = null;
@@ -212,7 +233,7 @@ export function validateBackup(text: string): BackupValidation {
     if (!settings || canonical(settings) !== canonical(data.settings)) return { ok: false, error: "The app-preferences section is invalid or uses an unsupported format." };
   }
 
-  const local: LocalData = { aftResults: results, training, profile, settings };
+  const local: LocalData = { aftResults: results, training: restoredTraining, profile, settings };
   return {
     ok: true,
     backup: createBackup(local, { exportedAt: parsed.exportedAt as string, appVersion: safeAppVersion(parsed.appVersion) }),
@@ -227,7 +248,7 @@ export function validateBackup(text: string): BackupValidation {
 export type ImportMode = "merge" | "replace";
 
 export type SectionChange = {
-  section: "aftResults" | "plans" | "completions" | "profile" | "settings";
+  section: "aftResults" | "plans" | "completions" | "workouts" | "setRecords" | "painReports" | "profile" | "settings";
   label: string;
   before: number;
   after: number;
@@ -247,6 +268,9 @@ export function countNewerLocal(local: LocalData, exportedAt: string): number {
     local.aftResults.filter((r) => after(r.savedAt)).length +
     local.training.plans.filter((p) => after(p.createdAt)).length +
     local.training.completions.filter((c) => after(c.completedAt)).length +
+    local.training.workouts.filter((w) => after(w.startedAt) || after(w.completedAt)).length +
+    local.training.setRecords.filter((r) => after(r.completedAt)).length +
+    local.training.painReports.filter((r) => after(r.reportedAt)).length +
     (after(local.profile?.updatedAt) ? 1 : 0) +
     (after(local.settings?.updatedAt) ? 1 : 0)
   );
@@ -273,6 +297,23 @@ const change = (section: SectionChange["section"], label: string, before: number
 //   identical in both, so every completion still points at its own plan and baseline.
 // - Profile and app preferences: kept from this browser if present, otherwise taken from the backup.
 // Replace: every section is replaced with the backup's contents (including empty sections).
+const LABELS = { workouts: "Started workouts", setRecords: "Recorded sets", painReports: "Pain reports" } as const;
+const same = (a: { planId: string; sessionId: string }, b: { planId: string; sessionId: string }) => a.planId === b.planId && a.sessionId === b.sessionId;
+
+// Replace is the one import that can remove pain records, so it says so for each plan it would un-pause.
+function replacedPauses(local: LocalData, next: LocalData): string[] {
+  const paused = (data: LocalData) =>
+    new Set([...data.training.painReports.map((r) => r.planId), ...data.training.completions.filter((c) => c.pain).map((c) => c.planId)]);
+  const before = paused(local);
+  const after = paused(next);
+  return [...before]
+    .filter((id) => !after.has(id))
+    .map((id) => {
+      const plan = local.training.plans.find((p) => p.id === id);
+      return `Replacing removes the pain reported for ${plan ? `the plan from ${plan.baseline.testDate}` : "a plan"} in this browser, so that pause is lifted. Talk to a medical provider or your unit's H2F team before training.`;
+    });
+}
+
 export function planImport(local: LocalData, incoming: LocalData, mode: ImportMode, exportedAt: string): ImportPlan {
   const newerLocal = countNewerLocal(local, exportedAt);
 
@@ -285,6 +326,15 @@ export function planImport(local: LocalData, incoming: LocalData, mode: ImportMo
         after: next.training.completions.length,
         removed: local.training.completions.length,
         added: next.training.completions.length,
+      }),
+      ...(["workouts", "setRecords"] as const).map((section) =>
+        change(section, LABELS[section], local.training[section].length, { after: next.training[section].length, removed: local.training[section].length, added: next.training[section].length })
+      ),
+      change("painReports", LABELS.painReports, local.training.painReports.length, {
+        after: next.training.painReports.length,
+        removed: local.training.painReports.length,
+        added: next.training.painReports.length,
+        notes: replacedPauses(local, next),
       }),
       change("profile", "Profile", local.profile ? 1 : 0, { after: next.profile ? 1 : 0, removed: local.profile ? 1 : 0, added: next.profile ? 1 : 0 }),
       change("settings", "App preferences", local.settings ? 1 : 0, { after: next.settings ? 1 : 0, removed: local.settings ? 1 : 0, added: next.settings ? 1 : 0 }),
@@ -330,21 +380,108 @@ export function planImport(local: LocalData, incoming: LocalData, mode: ImportMo
   }
   plansChange.after = plans.length;
 
+  // Pain reports are collected first so a pain record that can't be imported as-is still pauses its plan.
+  const painReports = [...local.training.painReports];
+  const pain = change("painReports", LABELS.painReports, painReports.length, { after: 0 });
+  const keepPain = (report: WorkoutPainReport, how: string) => {
+    if (painReports.some((x) => canonical(x) === canonical(report))) {
+      pain.duplicates++;
+      return;
+    }
+    painReports.push(report);
+    pain.added++;
+    if (how) pain.notes.push(how);
+  };
+
   // Completions
   const completions = [...local.training.completions];
   const done = change("completions", "Completed workouts", completions.length, { after: 0 });
+  const localWorkout = (c: { planId: string; sessionId: string }) => local.training.workouts.find((w) => same(w, c));
   for (const c of incoming.training.completions) {
-    const existing = completions.find((x) => x.planId === c.planId && x.sessionId === c.sessionId);
-    if (existing) {
-      if (canonical(existing) === canonical(c)) done.duplicates++;
-      else done.conflicts++;
-    } else if (!importedIds.has(c.planId)) done.conflicts++;
-    else {
+    const existing = completions.find((x) => same(x, c));
+    const tracked = localWorkout(c);
+    if (existing && canonical(existing) === canonical(c)) done.duplicates++;
+    else if (existing || !importedIds.has(c.planId) || (tracked && tracked.status !== "completed")) {
+      done.conflicts++;
+      // The record isn't imported, but its pain is: the plan it names stays paused.
+      if (c.pain && plans.some((p) => p.id === c.planId && p.sessions.some((s) => s.id === c.sessionId))) {
+        keepPain({ planId: c.planId, sessionId: c.sessionId, reportedAt: c.completedAt, notes: c.notes }, `A session record with pain (${c.sessionId}) conflicts with this browser's records, so its pain is added as a pain report.`);
+      }
+    } else {
       completions.push(c);
       done.added++;
     }
   }
   done.after = completions.length;
+
+  // Started workouts: matched by plan and session, imported only for imported or identical plans. A different
+  // snapshot for the same session is a conflict: this browser's workout and its recorded sets are kept.
+  const workouts = [...local.training.workouts];
+  const started = change("workouts", LABELS.workouts, workouts.length, { after: 0 });
+  const sameSnapshot = new Set<string>(); // sessions whose incoming set records match the kept snapshot
+  for (const w of incoming.training.workouts) {
+    const existing = workouts.find((x) => same(x, w));
+    const k = `${w.planId}/${w.sessionId}`;
+    if (existing) {
+      if (canonical(existing) === canonical(w)) started.duplicates++;
+      else {
+        started.conflicts++;
+        started.notes.push(
+          canonical(existing.snapshot) === canonical(w.snapshot)
+            ? `Workout ${w.sessionId}: this browser's status is kept; recorded sets from both are combined.`
+            : `Workout ${w.sessionId} was started separately in the backup with a different prescription. This browser's workout is kept and the backup's recorded sets for it are not imported.`
+        );
+      }
+      if (canonical(existing.snapshot) === canonical(w.snapshot)) sameSnapshot.add(k);
+      continue;
+    }
+    const legacyRecord = completions.find((c) => same(c, w));
+    const ownRecord = incoming.training.completions.find((c) => same(c, w));
+    const consistent = w.status === "completed" ? !!legacyRecord && !!ownRecord && canonical(legacyRecord) === canonical(ownRecord) : !legacyRecord;
+    if (!importedIds.has(w.planId) || !consistent) {
+      started.conflicts++;
+      started.notes.push(`Workout ${w.sessionId} conflicts with this browser's session record, so it is not imported.`);
+      continue;
+    }
+    workouts.push(w);
+    sameSnapshot.add(k);
+    started.added++;
+  }
+  started.after = workouts.length;
+
+  // Recorded sets: only for workouts whose kept snapshot is the backup's. Each set counts once; a completed local
+  // workout already has every set, so nothing is added to it.
+  const setRecords = [...local.training.setRecords];
+  const sets = change("setRecords", LABELS.setRecords, setRecords.length, { after: 0 });
+  for (const r of incoming.training.setRecords) {
+    const existing = setRecords.find((x) => same(x, r) && x.setId === r.setId);
+    if (existing) {
+      if (canonical(existing) === canonical(r)) sets.duplicates++;
+      else sets.conflicts++;
+    } else if (!sameSnapshot.has(`${r.planId}/${r.sessionId}`)) sets.conflicts++;
+    else {
+      setRecords.push(r);
+      sets.added++;
+    }
+  }
+  sets.after = setRecords.length;
+
+  // Pain reports: every one is kept. A set reference that doesn't match the kept workout is dropped from the report,
+  // never the report itself, unless its session doesn't exist in the kept plan.
+  for (const r of incoming.training.painReports) {
+    const plan = plans.find((p) => p.id === r.planId);
+    if (!plan || !plan.sessions.some((s) => s.id === r.sessionId)) {
+      pain.conflicts++;
+      pain.notes.push(`A pain report for session ${r.sessionId} refers to a session this browser's plan doesn't have, so it can't be attached. Talk to a medical provider or your unit's H2F team before training.`);
+      continue;
+    }
+    if (r.setId !== undefined && !sameSnapshot.has(`${r.planId}/${r.sessionId}`)) {
+      const { setId: _set, ...rest } = r;
+      void _set;
+      keepPain(rest, `A pain report for ${r.sessionId} is added without its set, because this browser's workout for that session differs.`);
+    } else keepPain(r, "");
+  }
+  pain.after = painReports.length;
 
   // Profile and settings
   const single = <T>(section: "profile" | "settings", label: string, mine: T | null, theirs: T | null) => {
@@ -366,9 +503,9 @@ export function planImport(local: LocalData, incoming: LocalData, mode: ImportMo
 
   const next: LocalData = {
     aftResults: results,
-    training: { ...local.training, plans, completions },
+    training: { ...local.training, plans, completions, workouts, setRecords, painReports },
     profile: profile.value,
     settings: settings.value,
   };
-  return { next, changes: [aft, plansChange, done, profile.c, settings.c], newerLocal, changed: canonical(next) !== canonical(local) };
+  return { next, changes: [aft, plansChange, done, started, sets, pain, profile.c, settings.c], newerLocal, changed: canonical(next) !== canonical(local) };
 }

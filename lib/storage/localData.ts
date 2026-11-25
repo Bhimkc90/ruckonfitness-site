@@ -1,5 +1,5 @@
 import { AFT_RESULTS_EVENT, AFT_RESULTS_KEY, AFT_RESULTS_SCHEMA_VERSION, parseAftResults } from "./aftResults";
-import { TRAINING_EVENT, TRAINING_KEY, parseTrainingData } from "./trainingPlans";
+import { TRAINING_EVENT, TRAINING_KEY, hasTrainingData, parseTrainingData } from "./trainingPlans";
 import { PROFILE_EVENT, PROFILE_KEY } from "./profile";
 import { SETTINGS_EVENT, SETTINGS_KEY } from "./settings";
 import { parseProfile } from "@/lib/profile/profile";
@@ -11,7 +11,7 @@ export type DataSection = "aftResults" | "training" | "profile" | "settings";
 
 export const DATA_SECTIONS: Record<DataSection, { key: string; event: string; label: string }> = {
   aftResults: { key: AFT_RESULTS_KEY, event: AFT_RESULTS_EVENT, label: "AFT history" },
-  training: { key: TRAINING_KEY, event: TRAINING_EVENT, label: "Training plans and completed workouts" },
+  training: { key: TRAINING_KEY, event: TRAINING_EVENT, label: "Training plans, workouts, and pain reports" },
   profile: { key: PROFILE_KEY, event: PROFILE_EVENT, label: "Profile" },
   settings: { key: SETTINGS_KEY, event: SETTINGS_EVENT, label: "App preferences" },
 };
@@ -50,7 +50,8 @@ function notify(sections: DataSection[]) {
 export function writeLocalData(data: LocalData): Result {
   const nextRaw: Record<DataSection, string | null> = {
     aftResults: data.aftResults.length ? JSON.stringify({ schemaVersion: AFT_RESULTS_SCHEMA_VERSION, results: data.aftResults }) : null,
-    training: data.training.plans.length || data.training.completions.length ? JSON.stringify(data.training) : null,
+    // Any training record keeps the section, so a pain report saved on its own is never dropped.
+    training: hasTrainingData(data.training) ? JSON.stringify(data.training) : null,
     profile: data.profile ? JSON.stringify(data.profile) : null,
     settings: data.settings ? JSON.stringify(data.settings) : null,
   };

@@ -1,10 +1,25 @@
 import { useSyncExternalStore } from "react";
 import { addDays, defaultSessionDate, weekWindow } from "@/lib/training/engine";
-import type { BaselineSnapshot, Difficulty, PlanDraft, SessionCompletion, StoredPlan } from "@/lib/training/types";
+import { PAIN_PAUSE_MESSAGE } from "@/lib/training/progress";
+import { planPaused } from "@/lib/training/workout";
+import type {
+  BaselineSnapshot,
+  Difficulty,
+  PlanDraft,
+  SafetyRecords,
+  SessionCompletion,
+  SetCompletion,
+  StoredPlan,
+  StoredWorkout,
+  WorkoutPainReport,
+} from "@/lib/training/types";
+import { sanitizeWorkoutData } from "./workoutRecords";
 
 // Training plans live in their own key, separate from AFT history, and only in this browser.
+// Schema 2 adds started workouts, set records, and pain reports; schema 1 data is read and upgraded on the next save.
 export const TRAINING_KEY = "ruckon.trainingPlans";
-export const TRAINING_SCHEMA_VERSION = 1;
+export const TRAINING_SCHEMA_VERSION = 2;
+export const LEGACY_TRAINING_SCHEMA_VERSIONS = [1] as const;
 export const TRAINING_EVENT = "ruckon:training-plans-changed";
 const STORAGE_KEY = TRAINING_KEY;
 const SCHEMA_VERSION = TRAINING_SCHEMA_VERSION;
@@ -14,9 +29,18 @@ export type TrainingData = {
   schemaVersion: number;
   plans: StoredPlan[];
   completions: SessionCompletion[];
+  workouts: StoredWorkout[];
+  setRecords: SetCompletion[];
+  painReports: WorkoutPainReport[];
 };
 
-export const EMPTY_TRAINING: TrainingData = { schemaVersion: SCHEMA_VERSION, plans: [], completions: [] };
+export const EMPTY_TRAINING: TrainingData = { schemaVersion: SCHEMA_VERSION, plans: [], completions: [], workouts: [], setRecords: [], painReports: [] };
+
+export function hasTrainingData(data: TrainingData): boolean {
+  return data.plans.length > 0 || data.completions.length > 0 || data.workouts.length > 0 || data.setRecords.length > 0 || data.painReports.length > 0;
+}
+
+export const safetyRecords = (data: TrainingData): SafetyRecords => ({ sessionCompletions: data.completions, painReports: data.painReports });
 
 // ---------------------------------------------------------------------------
 // Pure updates (tested without a browser)
@@ -26,7 +50,8 @@ export function parseTrainingData(raw: string | null): TrainingData {
   if (!raw) return EMPTY_TRAINING;
   try {
     const data = JSON.parse(raw) as Partial<TrainingData>;
-    if (data.schemaVersion !== SCHEMA_VERSION || !Array.isArray(data.plans) || !Array.isArray(data.completions)) return EMPTY_TRAINING;
+    const known = data.schemaVersion === SCHEMA_VERSION || (LEGACY_TRAINING_SCHEMA_VERSIONS as readonly unknown[]).includes(data.schemaVersion);
+    if (!known || !Array.isArray(data.plans) || !Array.isArray(data.completions)) return EMPTY_TRAINING;
     const plans = data.plans.filter(
       (p): p is StoredPlan =>
         !!p && typeof p.id === "string" && typeof p.startDate === "string" && Array.isArray(p.sessions) && !!p.baseline && typeof p.templateVersion === "string"
@@ -34,7 +59,9 @@ export function parseTrainingData(raw: string | null): TrainingData {
     const completions = data.completions.filter(
       (c): c is SessionCompletion => !!c && typeof c.planId === "string" && typeof c.sessionId === "string" && typeof c.completedAt === "string"
     );
-    return { schemaVersion: SCHEMA_VERSION, plans, completions };
+    // Schema 1 has no workout records. Legacy completed sessions get none: set records are never inferred.
+    const workouts = data.schemaVersion === SCHEMA_VERSION ? sanitizeWorkoutData(data as Record<string, unknown>, plans) : { workouts: [], setRecords: [], painReports: [] };
+    return { schemaVersion: SCHEMA_VERSION, plans, completions, ...workouts };
   } catch {
     return EMPTY_TRAINING;
   }
@@ -57,18 +84,50 @@ export function endPlan(data: TrainingData, planId: string): TrainingData {
   return { ...data, plans: data.plans.map((p) => (p.id === planId ? { ...p, status: "ended" as const } : p)) };
 }
 
+const sameSession = (x: { planId: string; sessionId: string }, planId: string, sessionId: string) => x.planId === planId && x.sessionId === sessionId;
+
+// Why the plan view's quick "record session" can't be used for a session, or null when it can. A paused plan
+// takes no new records; a session with a tracked workout is completed only through that workout's checks.
+export function legacyCompletionBlock(data: TrainingData, planId: string, sessionId: string): string | null {
+  const plan = data.plans.find((p) => p.id === planId);
+  if (!plan || !plan.sessions.some((s) => s.id === sessionId)) return "Session not found.";
+  if (planPaused(planId, safetyRecords(data))) return PAIN_PAUSE_MESSAGE;
+  if (data.workouts.some((w) => sameSession(w, planId, sessionId))) return "This session has a tracked workout. Finish it from the workout so every set is checked.";
+  return null;
+}
+
+// Records a session without set tracking (the existing plan view). Blocked as legacyCompletionBlock describes, and
+// a record with pain can never be replaced. Pain is never dropped: if the record itself is refused, the pain is
+// kept as a pain report.
 export function completeSession(
   data: TrainingData,
   entry: { planId: string; sessionId: string; completedAt: string; difficulty: Difficulty; pain: boolean; notes: string }
 ): TrainingData {
   const plan = data.plans.find((p) => p.id === entry.planId);
   if (!plan || !plan.sessions.some((s) => s.id === entry.sessionId)) return data;
-  const others = data.completions.filter((c) => !(c.planId === entry.planId && c.sessionId === entry.sessionId));
+  if (legacyCompletionBlock(data, entry.planId, entry.sessionId)) {
+    if (!entry.pain) return data;
+    const report: WorkoutPainReport = { planId: entry.planId, sessionId: entry.sessionId, reportedAt: entry.completedAt, notes: entry.notes.slice(0, 500) };
+    return { ...data, painReports: [...data.painReports, report] };
+  }
+  const others = data.completions.filter((c) => !sameSession(c, entry.planId, entry.sessionId));
   return { ...data, completions: [...others, { ...entry, notes: entry.notes.slice(0, 500) }] };
 }
 
+// Undo never lifts a pause: nothing is undone while the plan is paused, so a painful record stays. Undoing a
+// tracked workout's completion reopens the workout with its recorded sets.
 export function undoCompletion(data: TrainingData, planId: string, sessionId: string): TrainingData {
-  return { ...data, completions: data.completions.filter((c) => !(c.planId === planId && c.sessionId === sessionId)) };
+  if (planPaused(planId, safetyRecords(data))) return data;
+  return {
+    ...data,
+    completions: data.completions.filter((c) => !sameSession(c, planId, sessionId)),
+    workouts: data.workouts.map((w) => {
+      if (!sameSession(w, planId, sessionId) || w.status !== "completed") return w;
+      const { completedAt: _done, ...rest } = w;
+      void _done;
+      return { ...rest, status: "in-progress" as const };
+    }),
+  };
 }
 
 const HARD_KINDS = new Set(["strength", "speed", "conditioning"]);
@@ -84,6 +143,7 @@ export function rescheduleSession(
   const plan = data.plans.find((p) => p.id === planId);
   const session = plan?.sessions.find((s) => s.id === sessionId);
   if (!plan || !session) return { data, error: "Session not found." };
+  if (planPaused(planId, safetyRecords(data))) return { data, error: PAIN_PAUSE_MESSAGE };
   const { from, to } = weekWindow(plan.startDate, session.week);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < from || date > to) {
     return { data, error: `Choose a date in week ${session.week} (${from} to ${to}).` };
@@ -170,9 +230,27 @@ function subscribe(onChange: () => void) {
   };
 }
 
-export function writeTrainingData(data: TrainingData): { ok: true } | { ok: false; error: string } {
+// Stored data from a newer RuckOn version can't be read here; writing would overwrite it with an empty section.
+export function storedSchemaTooNew(raw: string | null): boolean {
+  if (!raw) return false;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const version = (JSON.parse(raw) as { schemaVersion?: unknown })?.schemaVersion;
+    return typeof version === "number" && version > SCHEMA_VERSION;
+  } catch {
+    return false;
+  }
+}
+
+const TOO_NEW = "Your training data was saved by a newer version of RuckOn. Update the app before changing it; nothing was changed.";
+
+export function readTrainingData(): TrainingData {
+  return getSnapshot();
+}
+
+export function writeTrainingData(data: TrainingData): { ok: true } | { ok: false; error: string } {
+  if (storedSchemaTooNew(readRaw())) return { ok: false, error: TOO_NEW };
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, schemaVersion: SCHEMA_VERSION }));
     window.dispatchEvent(new Event(CHANGE_EVENT));
     return { ok: true };
   } catch {
@@ -182,6 +260,17 @@ export function writeTrainingData(data: TrainingData): { ok: true } | { ok: fals
 
 export function updateTrainingData(update: (data: TrainingData) => TrainingData) {
   return writeTrainingData(update(getSnapshot()));
+}
+
+export type TrainingOperation<T extends object> = (data: TrainingData) => ({ ok: true; data: TrainingData } & T) | { ok: false; error: string };
+
+// Applies one operation to the stored data and saves it before returning, so every successful step is on disk.
+// A single setItem either stores the whole section or nothing, so a failed save leaves the previous data intact.
+export function commitTrainingData<T extends object>(operation: TrainingOperation<T>): ({ ok: true; data: TrainingData } & T) | { ok: false; error: string } {
+  const result = operation(getSnapshot());
+  if (!result.ok) return result;
+  const saved = writeTrainingData(result.data);
+  return saved.ok ? result : { ok: false, error: saved.error };
 }
 
 export function useTrainingData(): TrainingData {

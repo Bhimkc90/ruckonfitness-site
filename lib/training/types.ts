@@ -289,3 +289,14 @@ export type WorkoutPainReport = {
 // Every record that can pause a plan or hold its progression. Functions that offer or record training take
 // both, so neither source can be forgotten.
 export type SafetyRecords = { sessionCompletions: SessionCompletion[]; painReports: WorkoutPainReport[] };
+
+// A started workout as stored. Its snapshot is the frozen prescription; it is never rebuilt from the plan.
+// "completed" only through the tracked workflow, together with the session's completion record.
+export type StoredWorkout = {
+  planId: string;
+  sessionId: string;
+  status: "in-progress" | "completed";
+  startedAt: string; // ISO timestamp, the same as snapshot.createdAt
+  completedAt?: string; // ISO timestamp, present only when completed
+  snapshot: WorkoutSnapshot;
+};

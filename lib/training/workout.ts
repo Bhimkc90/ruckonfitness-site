@@ -412,12 +412,26 @@ export function trackableSetIds(workout: WorkoutSnapshot): string[] {
 const isTimestamp = (value: string) => /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value));
 const nonNegative = (n: unknown) => typeof n === "number" && Number.isFinite(n) && n >= 0;
 
+// Upper limits for recorded performance. Values above them are typing errors, not training, so they are rejected.
+export const ACTUAL_LIMITS = { reps: 1000, seconds: 6 * 3600, meters: 100_000, load: { lb: 1500, kg: 700 } } as const;
+
+const within = (n: unknown, max: number) => nonNegative(n) && (n as number) <= max;
+
 export function validateActual(actual: ActualPerformance): string[] {
   const errors: string[] = [];
-  if (actual.reps !== undefined && !(nonNegative(actual.reps) && Number.isInteger(actual.reps))) errors.push("Repetitions must be a whole number of 0 or more.");
-  if (actual.seconds !== undefined && !nonNegative(actual.seconds)) errors.push("Time must be 0 seconds or more.");
-  if (actual.meters !== undefined && !nonNegative(actual.meters)) errors.push("Distance must be 0 meters or more.");
-  if (actual.load !== undefined && !(nonNegative(actual.load.value) && (actual.load.unit === "lb" || actual.load.unit === "kg"))) errors.push("Weight must be 0 or more, in lb or kg.");
+  if (!actual || typeof actual !== "object" || Array.isArray(actual)) return ["Actual performance must be an object."];
+  if (Object.keys(actual).some((k) => !["reps", "seconds", "meters", "load"].includes(k))) errors.push("Actual performance has an unknown field.");
+  if (actual.reps !== undefined && !(within(actual.reps, ACTUAL_LIMITS.reps) && Number.isInteger(actual.reps)))
+    errors.push(`Repetitions must be a whole number from 0 to ${ACTUAL_LIMITS.reps}.`);
+  if (actual.seconds !== undefined && !within(actual.seconds, ACTUAL_LIMITS.seconds)) errors.push(`Time must be from 0 to ${ACTUAL_LIMITS.seconds} seconds.`);
+  if (actual.meters !== undefined && !within(actual.meters, ACTUAL_LIMITS.meters)) errors.push(`Distance must be from 0 to ${ACTUAL_LIMITS.meters} meters.`);
+  if (actual.load !== undefined) {
+    const load = actual.load as { value?: unknown; unit?: unknown } | null;
+    const unit = load?.unit;
+    const ok =
+      !!load && typeof load === "object" && Object.keys(load).every((k) => k === "value" || k === "unit") && (unit === "lb" || unit === "kg") && within(load.value, ACTUAL_LIMITS.load[unit]);
+    if (!ok) errors.push(`Weight must be 0 to ${ACTUAL_LIMITS.load.lb} lb or 0 to ${ACTUAL_LIMITS.load.kg} kg.`);
+  }
   return errors;
 }
 
