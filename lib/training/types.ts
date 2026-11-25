@@ -274,3 +274,18 @@ export type SetCompletion = {
   completedAt: string; // ISO timestamp
   actual?: ActualPerformance;
 };
+
+// Pain reported while a workout is under way, before the session is recorded. Like a session record with pain,
+// it pauses the whole plan. Phase 2 persists it on its own, immediately, so the pause survives a closed tab;
+// it is never folded into a session completion, which would mark the session done.
+export type WorkoutPainReport = {
+  planId: string;
+  sessionId: string;
+  reportedAt: string; // ISO timestamp
+  setId?: string; // the set in progress, if the person chose one
+  notes: string;
+};
+
+// Every record that can pause a plan or hold its progression. Functions that offer or record training take
+// both, so neither source can be forgotten.
+export type SafetyRecords = { sessionCompletions: SessionCompletion[]; painReports: WorkoutPainReport[] };

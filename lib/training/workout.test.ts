@@ -15,11 +15,17 @@ import {
   parseReps,
   parseRest,
   parseSeconds,
+  planPaused,
   recordSetCompletion,
-  sessionWorkout,
+  reportWorkoutPain,
+  resumeWorkout,
+  startWorkout,
+  trackableSetIds,
+  UNTRACKABLE_SET_MESSAGE,
   undoSetCompletion,
   workoutPhase,
   workoutProgress,
+  workoutReadiness,
   workoutSetIds,
 } from "./workout";
 import type {
@@ -29,10 +35,12 @@ import type {
   Preferences,
   Restriction,
   RunningVolume,
+  SafetyRecords,
   SessionCompletion,
   SetCompletion,
   StoredPlan,
   WorkoutExercise,
+  WorkoutPainReport,
   WorkoutSnapshot,
 } from "./types";
 
@@ -82,6 +90,9 @@ const completion = (sessionId: string, extra: Partial<SessionCompletion> = {}): 
   notes: "",
   ...extra,
 });
+
+const safety = (sessionCompletions: SessionCompletion[] = [], painReports: WorkoutPainReport[] = []): SafetyRecords => ({ sessionCompletions, painReports });
+const NONE = safety();
 
 const sdcFocus = baseline({ SDC: t(3, 30) });
 const plankFocus = baseline({ PLK: t(0, 50) });
@@ -389,14 +400,14 @@ describe("progression phase and the pain pause", () => {
   const week3 = plan.sessions.find((s) => s.week === 3 && s.kind === "strength")!;
 
   it("uses the foundation prescription in weeks 1–2 and build in weeks 3–4", () => {
-    expect(workoutPhase(plan, [], plan.sessions[0])).toEqual({ phase: "foundation", progressionHeld: false });
-    expect(workoutPhase(plan, [], week3)).toEqual({ phase: "build", progressionHeld: false });
+    expect(workoutPhase(plan, NONE, plan.sessions[0])).toEqual({ phase: "foundation", progressionHeld: false });
+    expect(workoutPhase(plan, NONE, week3)).toEqual({ phase: "build", progressionHeld: false });
   });
 
   it("holds weeks 3–4 at the foundation level after a session rated too hard", () => {
-    const outcome = sessionWorkout(plan, [completion("w1-s1", { difficulty: "too-hard" })], week3.id, CREATED);
-    expect(outcome.status).toBe("ready");
-    if (outcome.status !== "ready") return;
+    const outcome = startWorkout(plan, safety([completion("w1-s1", { difficulty: "too-hard" })]), week3.id, CREATED);
+    expect(outcome.status).toBe("started");
+    if (outcome.status !== "started") return;
     expect(outcome.workout.phase).toBe("foundation");
     expect(outcome.workout.progressionHeld).toBe(true);
     expect(byExercise(outcome.workout, "mdl-deadlift", "deadlift").sets).toHaveLength(2);
@@ -404,13 +415,13 @@ describe("progression phase and the pain pause", () => {
 
   it("offers no workout and accepts no set records after a pain report", () => {
     const pain = [completion("w1-s1", { pain: true })];
-    expect(sessionWorkout(plan, pain, "w1-s2", CREATED)).toEqual({ status: "paused", message: PAIN_PAUSE_MESSAGE });
+    expect(startWorkout(plan, safety(pain), "w1-s2", CREATED)).toEqual({ status: "paused", message: PAIN_PAUSE_MESSAGE });
     const w = workout(plan, sessionOf(plan, "w1-s2"));
-    expect(recordSetCompletion([], w, { setId: workoutSetIds(w)[0], completedAt: CREATED }, pain)).toEqual({ ok: false, errors: [PAIN_PAUSE_MESSAGE] });
+    expect(recordSetCompletion([], w, { setId: workoutSetIds(w)[0], completedAt: CREATED }, safety(pain))).toEqual({ ok: false, errors: [PAIN_PAUSE_MESSAGE] });
   });
 
   it("reports unknown sessions", () => {
-    expect(sessionWorkout(plan, [], "w9-s9", CREATED)).toEqual({ status: "not-found" });
+    expect(startWorkout(plan, NONE, "w9-s9", CREATED)).toEqual({ status: "not-found" });
   });
 
   it("carries the plan's sources, assumptions, and template version", () => {
@@ -522,7 +533,7 @@ describe("completion", () => {
     ];
     const progress = workoutProgress(w, records);
     expect(progress.overall.completed).toBe(1);
-    expect(progress.ignored).toEqual({ duplicate: 1, unknown: 1, otherSession: 2 });
+    expect(progress.ignored).toEqual({ duplicate: 1, unknown: 1, untrackable: 0, otherSession: 2 });
     expect(workoutProgress(w, ids.flatMap((id) => [rec(id), rec(id)])).overall.percent).toBe(100);
   });
 
@@ -539,11 +550,11 @@ describe("completion", () => {
   });
 
   it("records a set once, replacing an earlier record, with optional actual performance", () => {
-    const first = recordSetCompletion([], w, { setId: ids[0], completedAt: "2026-10-05T18:00:00.000Z" }, []);
+    const first = recordSetCompletion([], w, { setId: ids[0], completedAt: "2026-10-05T18:00:00.000Z" }, NONE);
     expect(first.ok).toBe(true);
     if (!first.ok) return;
     expect(first.records).toEqual([{ planId: "plan-1", sessionId: w.sessionId, setId: ids[0], completedAt: "2026-10-05T18:00:00.000Z" }]);
-    const second = recordSetCompletion(first.records, w, { setId: ids[0], completedAt: "2026-10-05T18:02:00.000Z", actual: { reps: 9, load: { value: 135, unit: "lb" } } }, []);
+    const second = recordSetCompletion(first.records, w, { setId: ids[0], completedAt: "2026-10-05T18:02:00.000Z", actual: { reps: 9, load: { value: 135, unit: "lb" } } }, NONE);
     expect(second.ok && second.records).toEqual([
       { planId: "plan-1", sessionId: w.sessionId, setId: ids[0], completedAt: "2026-10-05T18:02:00.000Z", actual: { reps: 9, load: { value: 135, unit: "lb" } } },
     ]);
@@ -560,9 +571,9 @@ describe("completion", () => {
   });
 
   it("rejects unknown sets, bad timestamps, and impossible performance", () => {
-    expect(recordSetCompletion([], w, { setId: "w1-s1/main/nope/1", completedAt: CREATED }, [])).toEqual({ ok: false, errors: ["That set is not part of this workout."] });
-    expect(recordSetCompletion([], w, { setId: ids[0], completedAt: "yesterday" }, [])).toEqual({ ok: false, errors: ["Completion time must be an ISO timestamp."] });
-    const bad = recordSetCompletion([], w, { setId: ids[0], completedAt: CREATED, actual: { reps: 2.5, seconds: -1, meters: Number.NaN, load: { value: -5, unit: "lb" } } }, []);
+    expect(recordSetCompletion([], w, { setId: "w1-s1/main/nope/1", completedAt: CREATED }, NONE)).toEqual({ ok: false, errors: ["That set is not part of this workout."] });
+    expect(recordSetCompletion([], w, { setId: ids[0], completedAt: "yesterday" }, NONE)).toEqual({ ok: false, errors: ["Completion time must be an ISO timestamp."] });
+    const bad = recordSetCompletion([], w, { setId: ids[0], completedAt: CREATED, actual: { reps: 2.5, seconds: -1, meters: Number.NaN, load: { value: -5, unit: "lb" } } }, NONE);
     expect(bad.ok === false && bad.errors).toHaveLength(4);
   });
 
@@ -663,9 +674,9 @@ describe("unsupported prescriptions and compatibility", () => {
     const old = { ...legacy, templateVersion: "starter-4wk-v3-draft" } as StoredPlan;
     const completions = [completion("w1-s1")];
     const before = structuredClone(completions);
-    const outcome = sessionWorkout(old, completions, "w1-s2", CREATED);
-    expect(outcome.status).toBe("ready");
-    if (outcome.status === "ready") {
+    const outcome = startWorkout(old, safety(completions), "w1-s2", CREATED);
+    expect(outcome.status).toBe("started");
+    if (outcome.status === "started") {
       expect(outcome.workout.templateVersion).toBe("starter-4wk-v3-draft");
       expect(outcome.workout.unsupported).toEqual([]);
     }
@@ -677,6 +688,268 @@ describe("unsupported prescriptions and compatibility", () => {
     const before = structuredClone(plan);
     for (const s of plan.sessions) workout(plan, s, "build");
     expect(plan).toEqual(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Completion readiness
+// ---------------------------------------------------------------------------
+
+describe("completion readiness", () => {
+  const plan = stored(prefs({ equipment: ["barbell-or-hex-bar"] }), mdlFocus);
+  const strength = firstOfKind(plan, "strength");
+  const at = "2026-10-05T18:00:00.000Z";
+  const recordsFor = (w: WorkoutSnapshot, ids: string[]): SetCompletion[] => ids.map((setId) => ({ planId: "plan-1", sessionId: w.sessionId, setId, completedAt: at }));
+
+  // An older template's drill wording the parser does not know.
+  function unreadDrill(): WorkoutSnapshot {
+    const session = structuredClone(plan.sessions[0]);
+    session.warmUp[0].items[0].prescription.foundation = { reps: "10 of each" };
+    return workout(plan, session);
+  }
+
+  it("is complete only when every set is recorded", () => {
+    const w = workout(plan, strength);
+    const ids = workoutSetIds(w);
+    expect(workoutReadiness(w, [], NONE)).toEqual({ status: "incomplete", remaining: ids.length });
+    expect(workoutReadiness(w, recordsFor(w, ids), NONE)).toEqual({ status: "complete" });
+  });
+
+  it("stays incomplete with one set left, however the records are repeated", () => {
+    const w = workout(plan, strength);
+    const ids = workoutSetIds(w).slice(1);
+    expect(workoutReadiness(w, [...recordsFor(w, ids), ...recordsFor(w, ids)], NONE)).toEqual({ status: "incomplete", remaining: 1 });
+  });
+
+  it("blocks a workout with an unread drill even when every other set is recorded", () => {
+    const w = unreadDrill();
+    const readiness = workoutReadiness(w, recordsFor(w, trackableSetIds(w)), NONE);
+    expect(readiness.status).toBe("blocked");
+    if (readiness.status !== "blocked") return;
+    expect(readiness.remaining).toBe(0);
+    expect(readiness.reasons).toHaveLength(10);
+    expect(readiness.reasons[0]).toBe('Bend and Reach: RuckOn could not read "10 of each", so set records can\'t show it was done.');
+  });
+
+  it("keeps unread drill exercises visible with their original instructions", () => {
+    const pd = section(unreadDrill(), "pd");
+    expect(memberIds(pd.exercises)).toEqual(getDrill("preparation-drill")!.sequence);
+    for (const e of pd.exercises) {
+      expect(e.supported).toBe(false);
+      expect(e.prescription).toEqual({ reps: "10 of each" });
+      expect(e.sets.map((x) => x.target)).toEqual([{ kind: "as-prescribed", text: "10 of each" }]);
+    }
+  });
+
+  it("refuses to record an unread set and never counts one", () => {
+    const w = unreadDrill();
+    const unread = section(w, "pd").exercises[0].sets[0].id;
+    expect(trackableSetIds(w)).not.toContain(unread);
+    expect(recordSetCompletion([], w, { setId: unread, completedAt: at }, NONE)).toEqual({ ok: false, errors: [UNTRACKABLE_SET_MESSAGE] });
+    const progress = workoutProgress(w, recordsFor(w, workoutSetIds(w)));
+    expect(progress.ignored.untrackable).toBe(10);
+    expect(progress.overall.untrackableSets).toBe(10);
+    expect(progress.overall.total).toBe(trackableSetIds(w).length);
+    expect(progress.sections.find((x) => x.id === section(w, "pd").id)).toMatchObject({ total: 0, percent: null, exercisesCompleted: 0, exercisesTotal: 10 });
+    expect(progress.exercises.find((e) => e.id === section(w, "pd").exercises[0].id)).toMatchObject({ total: 0, complete: false });
+    expect(latestSetRecords(w, recordsFor(w, [unread])).size).toBe(0);
+  });
+
+  it("blocks a workout with an unread main exercise", () => {
+    const session = structuredClone(strength);
+    session.main[0].items[0].prescription.foundation = { sets: "2", reps: "as many as you can" };
+    const w = workout(plan, session);
+    expect(workoutReadiness(w, recordsFor(w, trackableSetIds(w)), NONE)).toMatchObject({ status: "blocked", remaining: 0 });
+  });
+
+  it("blocks a workout with a drill that is not in the library", () => {
+    const session = structuredClone(plan.sessions[0]);
+    session.main[0].items.push({ kind: "drill", drillId: "conditioning-drill-9" as never, prescription: { foundation: {}, build: {} } });
+    const w = workout(plan, session);
+    const readiness = workoutReadiness(w, recordsFor(w, trackableSetIds(w)), NONE);
+    expect(readiness).toMatchObject({ status: "blocked", reasons: ['conditioning-drill-9: RuckOn could not read "Drill not in the library", so set records can\'t show it was done.'] });
+  });
+
+  it("blocks a workout with nothing to track instead of calling it complete", () => {
+    const empty: WorkoutSnapshot = { ...workout(plan, strength), sections: [], unsupported: [] };
+    expect(workoutReadiness(empty, [], NONE)).toEqual({ status: "blocked", reasons: ["This workout has no sets RuckOn can track."], remaining: 0 });
+  });
+
+  it("reports a pause before anything else", () => {
+    const w = workout(plan, strength);
+    expect(workoutReadiness(w, recordsFor(w, workoutSetIds(w)), safety([completion("w1-s1", { pain: true })]))).toEqual({ status: "paused", message: PAIN_PAUSE_MESSAGE });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pain during an unfinished workout
+// ---------------------------------------------------------------------------
+
+describe("pain during an unfinished workout", () => {
+  const plan = stored(prefs({ equipment: ["barbell-or-hex-bar"] }), mdlFocus);
+  const at = "2026-10-05T18:10:00.000Z";
+  const started = startWorkout(plan, NONE, "w1-s1", CREATED);
+  if (started.status !== "started") throw new Error("expected started");
+  const w = started.workout;
+  const ids = trackableSetIds(w);
+  const partial: SetCompletion[] = ids.slice(0, 3).map((setId) => ({ planId: "plan-1", sessionId: "w1-s1", setId, completedAt: at }));
+
+  function report(entry: Partial<{ reportedAt: string; setId: string; notes: string }> = {}): WorkoutPainReport {
+    const result = reportWorkoutPain(w, { reportedAt: at, notes: "", ...entry });
+    if (!result.ok) throw new Error(result.errors.join(" "));
+    return result.report;
+  }
+
+  it("creates a pain report for the session and set in progress, and pauses", () => {
+    const result = reportWorkoutPain(w, { reportedAt: at, setId: ids[3], notes: "Lower back" });
+    expect(result).toEqual({
+      ok: true,
+      report: { planId: "plan-1", sessionId: "w1-s1", reportedAt: at, setId: ids[3], notes: "Lower back" },
+      outcome: { status: "paused", message: PAIN_PAUSE_MESSAGE },
+    });
+    expect(report({ notes: "x".repeat(600) }).notes).toHaveLength(500);
+    expect(report()).not.toHaveProperty("setId");
+  });
+
+  it("accepts a report on an unread set, so pain can always be reported", () => {
+    const session = structuredClone(plan.sessions[0]);
+    session.warmUp[0].items[0].prescription.foundation = { reps: "10 of each" };
+    const unreadWorkout = workout(plan, session);
+    const unread = section(unreadWorkout, "pd").exercises[0].sets[0].id;
+    expect(reportWorkoutPain(unreadWorkout, { reportedAt: at, setId: unread, notes: "" }).ok).toBe(true);
+  });
+
+  it("rejects malformed reports", () => {
+    expect(reportWorkoutPain(w, { reportedAt: "now", notes: "" })).toEqual({ ok: false, errors: ["Report time must be an ISO timestamp."] });
+    expect(reportWorkoutPain(w, { reportedAt: at, setId: "w1-s1/main/nope/1", notes: "" })).toEqual({ ok: false, errors: ["That set is not part of this workout."] });
+  });
+
+  it("pauses the plan before the session is recorded", () => {
+    const pain = safety([], [report()]);
+    expect(planPaused("plan-1", pain)).toBe(true);
+    expect(workoutReadiness(w, partial, pain)).toEqual({ status: "paused", message: PAIN_PAUSE_MESSAGE });
+    expect(workoutReadiness(w, ids.map((setId) => ({ planId: "plan-1", sessionId: "w1-s1", setId, completedAt: at })), pain)).toEqual({ status: "paused", message: PAIN_PAUSE_MESSAGE });
+    expect(recordSetCompletion(partial, w, { setId: ids[3], completedAt: at }, pain)).toEqual({ ok: false, errors: [PAIN_PAUSE_MESSAGE] });
+    expect(resumeWorkout(plan, pain, w)).toEqual({ status: "paused", message: PAIN_PAUSE_MESSAGE });
+    expect(startWorkout(plan, pain, "w1-s2", CREATED)).toEqual({ status: "paused", message: PAIN_PAUSE_MESSAGE });
+  });
+
+  it("keeps the sets recorded before the report and marks nothing complete", () => {
+    const pain = safety([], [report()]);
+    const progress = workoutProgress(w, partial);
+    expect(progress.overall.completed).toBe(3);
+    expect(workoutReadiness(w, partial, pain).status).toBe("paused");
+    expect(pain.sessionCompletions).toEqual([]);
+  });
+
+  it("does not pause a different plan", () => {
+    const other = { ...report(), planId: "plan-2" };
+    expect(planPaused("plan-1", safety([], [other]))).toBe(false);
+    expect(startWorkout(plan, safety([], [other]), "w1-s2", CREATED).status).toBe("started");
+  });
+
+  it("holds weeks 3–4 at the foundation level, like a painful session record", () => {
+    const week3 = plan.sessions.find((s) => s.week === 3 && s.kind === "strength")!;
+    expect(workoutPhase(plan, safety([], [report()]), week3)).toEqual({ phase: "foundation", progressionHeld: true });
+    // A report in the same week does not count as an earlier session (the plan is paused anyway).
+    const sameWeek = { ...report(), sessionId: week3.id };
+    expect(workoutPhase(plan, safety([], [sameWeek]), week3)).toEqual({ phase: "build", progressionHeld: false });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A started workout keeps its snapshot
+// ---------------------------------------------------------------------------
+
+describe("a started workout keeps its snapshot", () => {
+  const plan = stored(prefs({ equipment: ["barbell-or-hex-bar"] }), mdlFocus);
+  const week3 = plan.sessions.filter((s) => s.week === 3 && s.kind === "strength");
+  const at = "2026-10-19T18:00:00.000Z";
+
+  function start(id: string, records = NONE): WorkoutSnapshot {
+    const outcome = startWorkout(plan, records, id, at);
+    if (outcome.status !== "started") throw new Error(`expected started, got ${outcome.status}`);
+    return outcome.workout;
+  }
+
+  it("keeps the build workload after later feedback would hold progression, and says so", () => {
+    const started = start(week3[0].id);
+    expect(started.phase).toBe("build");
+    expect(byExercise(started, "mdl-deadlift", "deadlift").sets).toHaveLength(3);
+    const tooHard = safety([completion("w1-s1", { difficulty: "too-hard" })]);
+    const resumed = resumeWorkout(plan, tooHard, started);
+    expect(resumed.status).toBe("in-progress");
+    if (resumed.status !== "in-progress") return;
+    expect(resumed.workout).toEqual(started);
+    expect(resumed.notice).toBe(
+      "Records added since you started this workout would now set it at the weeks 1–2 level. This workout keeps the weeks 3–4 level it started with; the change applies from your next workout. Stop if it feels too hard."
+    );
+    // The next workout started from the same plan uses the new phase.
+    expect(start(week3[0].id, tooHard).phase).toBe("foundation");
+  });
+
+  it("keeps the held workload when the feedback that held it is removed", () => {
+    const tooHard = safety([completion("w1-s1", { difficulty: "too-hard" })]);
+    const started = start(week3[0].id, tooHard);
+    expect(started).toMatchObject({ phase: "foundation", progressionHeld: true });
+    const resumed = resumeWorkout(plan, NONE, started);
+    expect(resumed.status === "in-progress" && resumed.workout).toEqual(started);
+    expect(resumed.status === "in-progress" && resumed.notice).toMatch(/would now set it at the weeks 3–4 level/);
+  });
+
+  it("has no notice when nothing changed", () => {
+    const started = start(week3[0].id);
+    expect(resumeWorkout(plan, NONE, started)).toEqual({ status: "in-progress", workout: started });
+  });
+
+  it("keeps counting sets recorded against the snapshot after progression changes", () => {
+    const started = start(week3[0].id);
+    const third = byExercise(started, "mdl-deadlift", "deadlift").sets[2].id;
+    const tooHard = safety([completion("w1-s1", { difficulty: "too-hard" })]);
+    const result = recordSetCompletion([], started, { setId: third, completedAt: at }, tooHard);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(workoutProgress(started, result.records).exercises.find((e) => e.id === byExercise(started, "mdl-deadlift", "deadlift").id)).toMatchObject({ completed: 1, total: 3 });
+  });
+
+  it("cannot be changed after it is built", () => {
+    const started = start(week3[0].id);
+    const deadlift = byExercise(started, "mdl-deadlift", "deadlift");
+    expect(Object.isFrozen(started)).toBe(true);
+    expect(Object.isFrozen(deadlift.sets[0].target)).toBe(true);
+    expect(() => {
+      (deadlift.sets as unknown as unknown[]).push({});
+    }).toThrow(TypeError);
+    expect(() => {
+      (started as { phase: string }).phase = "foundation";
+    }).toThrow(TypeError);
+  });
+
+  it("shares nothing with the plan", () => {
+    const local = stored(prefs({ equipment: ["barbell-or-hex-bar"] }), mdlFocus);
+    const session = local.sessions.find((s) => s.week === 3 && s.kind === "strength")!;
+    const outcome = startWorkout(local, NONE, session.id, at);
+    if (outcome.status !== "started") throw new Error("expected started");
+    const before = structuredClone(outcome.workout);
+    session.main[0].items[0].prescription.build.sets = "5";
+    session.main[0].sources.push("changed later");
+    expect(outcome.workout).toEqual(before);
+    expect(Object.isFrozen(session.main[0].sources)).toBe(false);
+  });
+
+  it("resumes a stored copy unchanged and frozen, without freezing the caller's object", () => {
+    const stored = JSON.parse(JSON.stringify(start(week3[0].id))) as WorkoutSnapshot;
+    const resumed = resumeWorkout(plan, NONE, stored);
+    expect(resumed.status === "in-progress" && resumed.workout).toEqual(stored);
+    expect(resumed.status === "in-progress" && Object.isFrozen(resumed.workout)).toBe(true);
+    expect(Object.isFrozen(stored)).toBe(false);
+  });
+
+  it("refuses a snapshot from another plan, session, plan version, or format", () => {
+    const started = start(week3[0].id);
+    expect(resumeWorkout({ ...plan, id: "plan-2" }, NONE, started)).toMatchObject({ status: "mismatch" });
+    expect(resumeWorkout(plan, NONE, { ...started, sessionId: "w9-s9" })).toMatchObject({ status: "mismatch" });
+    expect(resumeWorkout({ ...plan, templateVersion: "starter-4wk-v5" }, NONE, started)).toEqual({ status: "mismatch", reason: "This workout was started from a different version of the plan." });
+    expect(resumeWorkout(plan, NONE, { ...started, schemaVersion: 2 as never })).toEqual({ status: "mismatch", reason: "This workout was saved in a format RuckOn no longer reads." });
   });
 });
 
@@ -731,7 +1004,7 @@ describe("generated plans across preferences", () => {
     const restrictions = new Set(p.restrictions);
     const seen = new Set<string>();
     for (const session of plan.sessions) {
-      const phase = workoutPhase(plan, [], session).phase;
+      const phase = workoutPhase(plan, NONE, session).phase;
       const w = buildWorkout(plan, session, { phase, createdAt: CREATED });
       const foundation = phase === "build" ? buildWorkout(plan, session, { phase: "foundation", createdAt: CREATED }) : w;
       if (w.unsupported.length) problems.push(`${label} ${session.id}: unsupported ${JSON.stringify(w.unsupported)}`);

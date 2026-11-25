@@ -1,7 +1,7 @@
 import { cadenceLabels, getDrill, getExercise } from "@/lib/library";
 import type { Drill, DrillExecution } from "@/lib/library/types";
 import { exerciseAllowed } from "./engine";
-import { PAIN_PAUSE_MESSAGE, painReported, progressionHeld } from "./progress";
+import { PAIN_PAUSE_MESSAGE, progressionHeld } from "./progress";
 import { activities } from "./templates";
 import type {
   ActivityId,
@@ -13,11 +13,12 @@ import type {
   Preferences,
   Prescription,
   ProgressionPhase,
-  SessionCompletion,
+  SafetyRecords,
   SetCompletion,
   StoredPlan,
   WorkoutExercise,
   WorkoutExerciseSource,
+  WorkoutPainReport,
   WorkoutRest,
   WorkoutSection,
   WorkoutSetUnit,
@@ -42,11 +43,18 @@ export const MMD1_COURSE: Record<string, number> = { vertical: 50, lateral: 50, 
 // ---------------------------------------------------------------------------
 
 // The same rule the plan view uses: weeks 3–4 use the build prescription unless an earlier session was too hard
-// or painful.
-export function workoutPhase(plan: StoredPlan, completions: SessionCompletion[], session: PlanSession): { phase: ProgressionPhase; progressionHeld: boolean } {
+// or painful. Pain reported during an earlier week's workout holds progression the same way.
+export function workoutPhase(plan: StoredPlan, safety: SafetyRecords, session: PlanSession): { phase: ProgressionPhase; progressionHeld: boolean } {
   if (session.week < 3) return { phase: "foundation", progressionHeld: false };
-  const held = progressionHeld(plan, completions, session.week);
+  const earlier = new Set(plan.sessions.filter((s) => s.week < session.week).map((s) => s.id));
+  const held =
+    progressionHeld(plan, safety.sessionCompletions, session.week) || safety.painReports.some((r) => r.planId === plan.id && earlier.has(r.sessionId));
   return { phase: held ? "foundation" : "build", progressionHeld: held };
+}
+
+// A pain report from either source pauses the whole plan. RuckOn sets no rule for resuming (see progress.ts).
+export function planPaused(planId: string, safety: SafetyRecords): boolean {
+  return safety.sessionCompletions.some((c) => c.planId === planId && c.pain) || safety.painReports.some((r) => r.planId === planId);
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +325,7 @@ export function buildWorkout(plan: StoredPlan, session: PlanSession, options: { 
       return { id, phase, blockId: block.id, title: block.title, minutes: block.minutes, exercises, excluded, sources: block.sources, assumptions: block.assumptions };
     })
   );
-  return {
+  return freeze({
     schemaVersion: WORKOUT_SCHEMA_VERSION,
     planId: plan.id,
     sessionId: session.id,
@@ -332,24 +340,69 @@ export function buildWorkout(plan: StoredPlan, session: PlanSession, options: { 
     sections,
     unsupported: b.unsupported,
     safety: WORKOUT_SAFETY,
+  });
+}
+
+// A snapshot is a deep, frozen copy: it shares nothing with the plan, and nothing can change it after it is built.
+function freeze<T>(value: T): T {
+  const copy = structuredClone(value);
+  const deep = (v: unknown) => {
+    if (v && typeof v === "object" && !Object.isFrozen(v)) {
+      Object.freeze(v);
+      Object.values(v).forEach(deep);
+    }
   };
+  deep(copy);
+  return copy;
 }
 
 export type WorkoutOutcome =
-  | { status: "ready"; workout: WorkoutSnapshot }
+  | { status: "started"; workout: WorkoutSnapshot }
   | { status: "paused"; message: string }
   | { status: "not-found" };
 
-// A pain report pauses the plan, so no workout is offered (see PAIN_PAUSE_MESSAGE in progress.ts).
-export function sessionWorkout(plan: StoredPlan, completions: SessionCompletion[], sessionId: string, createdAt: string): WorkoutOutcome {
+// Starting a workout fixes its exercises, sets, and progression phase in a snapshot. Phase 2 stores that snapshot
+// and continues it with resumeWorkout; it never calls startWorkout again for a workout already under way.
+export function startWorkout(plan: StoredPlan, safety: SafetyRecords, sessionId: string, startedAt: string): WorkoutOutcome {
   const session = plan.sessions.find((s) => s.id === sessionId);
   if (!session) return { status: "not-found" };
-  if (painReported(plan, completions)) return { status: "paused", message: PAIN_PAUSE_MESSAGE };
-  return { status: "ready", workout: buildWorkout(plan, session, { ...workoutPhase(plan, completions, session), createdAt }) };
+  if (planPaused(plan.id, safety)) return { status: "paused", message: PAIN_PAUSE_MESSAGE };
+  return { status: "started", workout: buildWorkout(plan, session, { ...workoutPhase(plan, safety, session), createdAt: startedAt }) };
+}
+
+export type ResumeOutcome =
+  | { status: "in-progress"; workout: WorkoutSnapshot; notice?: string }
+  | { status: "paused"; message: string }
+  | { status: "mismatch"; reason: string };
+
+const phaseLabel: Record<ProgressionPhase, string> = { foundation: "the weeks 1–2 level", build: "the weeks 3–4 level" };
+
+// Continues a started workout with exactly the snapshot it started with. Feedback recorded since then is not
+// applied to it; when it would now give a different phase, a notice says so and it applies from the next workout.
+// Pain is the exception: it pauses the plan, so the workout cannot continue.
+export function resumeWorkout(plan: StoredPlan, safety: SafetyRecords, started: WorkoutSnapshot): ResumeOutcome {
+  if (planPaused(plan.id, safety)) return { status: "paused", message: PAIN_PAUSE_MESSAGE };
+  const session = plan.sessions.find((s) => s.id === started.sessionId);
+  if (started.schemaVersion !== WORKOUT_SCHEMA_VERSION) return { status: "mismatch", reason: "This workout was saved in a format RuckOn no longer reads." };
+  if (started.planId !== plan.id || !session) return { status: "mismatch", reason: "This workout belongs to a different plan or session." };
+  if (started.templateVersion !== plan.templateVersion) return { status: "mismatch", reason: "This workout was started from a different version of the plan." };
+  const now = workoutPhase(plan, safety, session).phase;
+  const workout = freeze(started);
+  if (now === started.phase) return { status: "in-progress", workout };
+  return {
+    status: "in-progress",
+    workout,
+    notice: `Records added since you started this workout would now set it at ${phaseLabel[now]}. This workout keeps ${phaseLabel[started.phase]} it started with; the change applies from your next workout. Stop if it feels too hard.`,
+  };
 }
 
 export function workoutSetIds(workout: WorkoutSnapshot): string[] {
   return workout.sections.flatMap((s) => s.exercises.flatMap((e) => e.sets.map((set) => set.id)));
+}
+
+// Sets RuckOn can record and count. "As written" sets stay visible with their instructions but are never tracked.
+export function trackableSetIds(workout: WorkoutSnapshot): string[] {
+  return workout.sections.flatMap((s) => s.exercises.flatMap((e) => e.sets.filter((set) => set.target.kind !== "as-prescribed").map((set) => set.id)));
 }
 
 // ---------------------------------------------------------------------------
@@ -368,17 +421,21 @@ export function validateActual(actual: ActualPerformance): string[] {
   return errors;
 }
 
+export const UNTRACKABLE_SET_MESSAGE =
+  "RuckOn could not read this prescription, so it can't record it set by set. Follow the written instructions, then record the session yourself.";
+
 // Records one set. A second record for the same set replaces the first, so a set is never counted twice.
-// Session completions are required so a pain report blocks new records the same way it blocks sessions.
+// Safety records are required so a pain report from either source blocks new records.
 export function recordSetCompletion(
   records: SetCompletion[],
   workout: WorkoutSnapshot,
   entry: { setId: string; completedAt: string; actual?: ActualPerformance },
-  sessionCompletions: SessionCompletion[]
+  safety: SafetyRecords
 ): { ok: true; records: SetCompletion[] } | { ok: false; errors: string[] } {
-  if (sessionCompletions.some((c) => c.planId === workout.planId && c.pain)) return { ok: false, errors: [PAIN_PAUSE_MESSAGE] };
+  if (planPaused(workout.planId, safety)) return { ok: false, errors: [PAIN_PAUSE_MESSAGE] };
   const errors: string[] = [];
   if (!workoutSetIds(workout).includes(entry.setId)) errors.push("That set is not part of this workout.");
+  else if (!trackableSetIds(workout).includes(entry.setId)) errors.push(UNTRACKABLE_SET_MESSAGE);
   if (!isTimestamp(entry.completedAt)) errors.push("Completion time must be an ISO timestamp.");
   if (entry.actual) errors.push(...validateActual(entry.actual));
   if (errors.length) return { ok: false, errors };
@@ -393,13 +450,15 @@ export function undoSetCompletion(records: SetCompletion[], planId: string, sess
 
 export type CompletionCount = { completed: number; total: number; percent: number | null };
 
+// Counts cover trackable sets only. An exercise with an unread prescription has no trackable sets, so it is never
+// complete; workoutReadiness reports the workout as blocked rather than letting a percentage stand in for it.
 export type WorkoutProgress = {
-  overall: CompletionCount & { exercisesCompleted: number; exercisesTotal: number };
+  overall: CompletionCount & { exercisesCompleted: number; exercisesTotal: number; untrackableSets: number };
   sections: (CompletionCount & { id: string; exercisesCompleted: number; exercisesTotal: number })[];
   exercises: (CompletionCount & { id: string; complete: boolean })[];
-  // Records that did not count: repeats of a set already counted, set IDs this workout doesn't have, and
-  // records for other plans or sessions.
-  ignored: { duplicate: number; unknown: number; otherSession: number };
+  // Records that did not count: repeats of a set already counted, set IDs this workout doesn't have, records for
+  // "as written" sets, and records for other plans or sessions.
+  ignored: { duplicate: number; unknown: number; untrackable: number; otherSession: number };
 };
 
 // Rounded down so 100% means every set was recorded. Null when there is nothing to track.
@@ -407,18 +466,21 @@ const count = (completed: number, total: number): CompletionCount => ({ complete
 
 // Counts each known set at most once. Only what was recorded counts; a session record does not complete sets.
 export function workoutProgress(workout: WorkoutSnapshot, records: SetCompletion[]): WorkoutProgress {
-  const known = new Set(workoutSetIds(workout));
+  const all = new Set(workoutSetIds(workout));
+  const known = new Set(trackableSetIds(workout));
   const done = new Set<string>();
-  const ignored = { duplicate: 0, unknown: 0, otherSession: 0 };
+  const ignored = { duplicate: 0, unknown: 0, untrackable: 0, otherSession: 0 };
   for (const r of records) {
     if (r.planId !== workout.planId || r.sessionId !== workout.sessionId) ignored.otherSession++;
-    else if (!known.has(r.setId)) ignored.unknown++;
+    else if (!all.has(r.setId)) ignored.unknown++;
+    else if (!known.has(r.setId)) ignored.untrackable++;
     else if (done.has(r.setId)) ignored.duplicate++;
     else done.add(r.setId);
   }
   const exercises = workout.sections.flatMap((s) =>
     s.exercises.map((e) => {
-      const c = count(e.sets.filter((set) => done.has(set.id)).length, e.sets.length);
+      const sets = e.sets.filter((set) => known.has(set.id));
+      const c = count(sets.filter((set) => done.has(set.id)).length, sets.length);
       return { id: e.id, ...c, complete: c.total > 0 && c.completed === c.total };
     })
   );
@@ -437,6 +499,7 @@ export function workoutProgress(workout: WorkoutSnapshot, records: SetCompletion
       ...count(done.size, known.size),
       exercisesCompleted: exercises.filter((e) => e.complete).length,
       exercisesTotal: exercises.length,
+      untrackableSets: all.size - known.size,
     },
     sections,
     exercises,
@@ -446,7 +509,7 @@ export function workoutProgress(workout: WorkoutSnapshot, records: SetCompletion
 
 // The newest record for each set, for showing actual performance.
 export function latestSetRecords(workout: WorkoutSnapshot, records: SetCompletion[]): Map<string, SetCompletion> {
-  const known = new Set(workoutSetIds(workout));
+  const known = new Set(trackableSetIds(workout));
   const latest = new Map<string, SetCompletion>();
   for (const r of records) {
     if (r.planId !== workout.planId || r.sessionId !== workout.sessionId || !known.has(r.setId)) continue;
@@ -454,4 +517,46 @@ export function latestSetRecords(workout: WorkoutSnapshot, records: SetCompletio
     if (!prev || r.completedAt > prev.completedAt) latest.set(r.setId, r);
   }
   return latest;
+}
+
+// ---------------------------------------------------------------------------
+// Completion readiness and pain during a workout
+// ---------------------------------------------------------------------------
+
+// Whether set records alone can show the workout was done. "complete" is the only result that may complete a
+// session automatically; "blocked" never can, however many sets are recorded, and the person records the session.
+export type WorkoutReadiness =
+  | { status: "complete" }
+  | { status: "incomplete"; remaining: number }
+  | { status: "blocked"; reasons: string[]; remaining: number }
+  | { status: "paused"; message: string };
+
+export function workoutReadiness(workout: WorkoutSnapshot, records: SetCompletion[], safety: SafetyRecords): WorkoutReadiness {
+  if (planPaused(workout.planId, safety)) return { status: "paused", message: PAIN_PAUSE_MESSAGE };
+  const { overall } = workoutProgress(workout, records);
+  const remaining = overall.total - overall.completed;
+  const reasons = workout.unsupported.map((u) => `${u.name}: RuckOn could not read "${u.text}", so set records can't show it was done.`);
+  if (overall.total === 0) reasons.push("This workout has no sets RuckOn can track.");
+  if (reasons.length) return { status: "blocked", reasons, remaining };
+  return remaining ? { status: "incomplete", remaining } : { status: "complete" };
+}
+
+// Pain reported before the session is finished. The report is the pause: Phase 2 saves it first and on its own,
+// then stops the workout. Sets already recorded are kept; nothing is marked complete.
+export function reportWorkoutPain(
+  workout: WorkoutSnapshot,
+  entry: { reportedAt: string; setId?: string; notes: string }
+): { ok: true; report: WorkoutPainReport; outcome: { status: "paused"; message: string } } | { ok: false; errors: string[] } {
+  const errors: string[] = [];
+  if (!isTimestamp(entry.reportedAt)) errors.push("Report time must be an ISO timestamp.");
+  if (entry.setId !== undefined && !workoutSetIds(workout).includes(entry.setId)) errors.push("That set is not part of this workout.");
+  if (errors.length) return { ok: false, errors };
+  const report: WorkoutPainReport = {
+    planId: workout.planId,
+    sessionId: workout.sessionId,
+    reportedAt: entry.reportedAt,
+    ...(entry.setId !== undefined ? { setId: entry.setId } : {}),
+    notes: entry.notes.slice(0, 500),
+  };
+  return { ok: true, report, outcome: { status: "paused", message: PAIN_PAUSE_MESSAGE } };
 }
