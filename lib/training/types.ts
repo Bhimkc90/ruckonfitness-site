@@ -299,4 +299,16 @@ export type StoredWorkout = {
   startedAt: string; // ISO timestamp, the same as snapshot.createdAt
   completedAt?: string; // ISO timestamp, present only when completed
   snapshot: WorkoutSnapshot;
+  // Active workout time. Absent on workouts saved before timing existed.
+  timer?: WorkoutTimer;
+  // Active time when the workout was completed, in whole seconds. Absent for workouts completed before timing existed.
+  durationSeconds?: number;
+};
+
+// Accumulated active time plus the segment running now. A running segment counts only up to shortly after the last
+// sign of activity (lastSeenAt), so a workout left open or abandoned doesn't count the hours away.
+export type WorkoutTimer = {
+  elapsedMs: number;
+  runningSince?: string; // ISO timestamp; absent while paused
+  lastSeenAt?: string; // ISO timestamp of the last heartbeat or action while running
 };

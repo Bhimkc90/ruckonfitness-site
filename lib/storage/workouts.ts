@@ -15,6 +15,13 @@ import {
 import type { ActualPerformance, Difficulty, SessionCompletion, StoredWorkout, WorkoutPainReport, WorkoutSnapshot } from "@/lib/training/types";
 import { commitTrainingData, safetyRecords, type TrainingData, type TrainingOperation } from "./trainingPlans";
 import { WORKOUT_LIMITS, isTimestamp } from "./workoutRecords";
+import { pauseTimer, resumeTimer, timerElapsedMs, timerRunning, touchTimer } from "@/lib/training/workoutTimer";
+
+// Replaces one stored workout, matched by plan and session.
+const withWorkout = (data: TrainingData, w: StoredWorkout, patch: Partial<StoredWorkout>): TrainingData => ({
+  ...data,
+  workouts: data.workouts.map((x) => (x.planId === w.planId && x.sessionId === w.sessionId ? { ...x, ...patch } : x)),
+});
 
 // Tracked-workout lifecycle on top of the training section. Each operation is pure (data in, data out) and has a
 // save* wrapper that writes the result to browser storage before returning.
@@ -80,7 +87,8 @@ export function startOrResumeWorkout(data: TrainingData, planId: string, session
   if (!state.eligible) return fail(state.reasons.join(" "));
   const started = startWorkout(found.plan, safety, sessionId, at);
   if (started.status !== "started") return fail(started.status === "paused" ? started.message : "Session not found.");
-  const stored: StoredWorkout = { planId, sessionId, status: "in-progress", startedAt: at, snapshot: started.workout };
+  // The workout clock starts with the workout.
+  const stored: StoredWorkout = { planId, sessionId, status: "in-progress", startedAt: at, snapshot: started.workout, timer: { elapsedMs: 0, runningSince: at, lastSeenAt: at } };
   return { ok: true, data: { ...data, workouts: [...data.workouts, stored] }, workout: started.workout, resumed: false };
 }
 
@@ -96,7 +104,9 @@ export function recordWorkoutSet(
   if (data.setRecords.length >= WORKOUT_LIMITS.setRecords) return fail("RuckOn can't store more recorded sets in this browser.");
   const result = recordSetCompletion(data.setRecords, open.found.workout.snapshot, entry, safetyRecords(data));
   if (!result.ok) return fail(result.errors.join(" "));
-  return { ok: true, data: { ...data, setRecords: result.records } };
+  // Recording a set is activity: it keeps a running clock alive (or closes one left stale).
+  const { timer } = touchTimer(open.found.workout.timer, entry.completedAt);
+  return { ok: true, data: { ...withWorkout(data, open.found.workout, timer ? { timer } : {}), setRecords: result.records } };
 }
 
 // Undo is for a set recorded by mistake. It is refused while the plan is paused, so recorded progress is kept.
@@ -116,16 +126,49 @@ export function reportPain(data: TrainingData, planId: string, sessionId: string
   if (typeof entry?.notes !== "string") return fail("Notes must be text.");
   if (data.painReports.length >= WORKOUT_LIMITS.painReports) return fail("RuckOn can't store more pain reports in this browser. Talk to a medical provider or your unit's H2F team.");
   let report: WorkoutPainReport;
+  let next = data;
   if (found.workout) {
     const result = reportWorkoutPain(found.workout.snapshot, entry);
     if (!result.ok) return fail(result.errors.join(" "));
     report = result.report;
+    // The plan pauses, so the workout clock stops at the report.
+    if (found.workout.status === "in-progress" && timerRunning(found.workout.timer)) next = withWorkout(data, found.workout, { timer: pauseTimer(found.workout.timer, entry.reportedAt) });
   } else {
     if (!isTimestamp(entry.reportedAt)) return fail("Report time must be an ISO timestamp.");
     if (entry.setId !== undefined) return fail("That set is not part of this workout.");
     report = { planId, sessionId, reportedAt: entry.reportedAt, notes: entry.notes.slice(0, WORKOUT_LIMITS.notes) };
   }
-  return { ok: true, data: { ...data, painReports: [...data.painReports, report] }, report, message: PAIN_PAUSE_MESSAGE };
+  return { ok: true, data: { ...next, painReports: [...next.painReports, report] }, report, message: PAIN_PAUSE_MESSAGE };
+}
+
+// ---------------------------------------------------------------------------
+// Workout clock. Same guard as recording a set: only an open workout whose turn it is, on an unpaused plan.
+// ---------------------------------------------------------------------------
+
+function clockOperation(data: TrainingData, planId: string, sessionId: string, at: string, change: (w: StoredWorkout) => Partial<StoredWorkout>): Result<{ workout: StoredWorkout }> {
+  const open = openWorkout(data, planId, sessionId, at);
+  if ("error" in open) return fail(open.error);
+  const patch = change(open.found.workout);
+  const next = withWorkout(data, open.found.workout, patch);
+  return { ok: true, data: next, workout: { ...open.found.workout, ...patch } };
+}
+
+export const pauseWorkoutClock = (data: TrainingData, planId: string, sessionId: string, at: string) =>
+  clockOperation(data, planId, sessionId, at, (w) => ({ timer: pauseTimer(w.timer, at) }));
+
+// Also starts the clock on a workout saved before timing existed, from now: earlier time isn't known.
+export const resumeWorkoutClock = (data: TrainingData, planId: string, sessionId: string, at: string) =>
+  clockOperation(data, planId, sessionId, at, (w) => ({ timer: resumeTimer(w.timer, at) }));
+
+// The page's heartbeat while it is open and visible. A clock left stale pauses instead (autoPaused).
+export function heartbeatWorkoutClock(data: TrainingData, planId: string, sessionId: string, at: string): Result<{ workout: StoredWorkout; autoPaused: boolean }> {
+  let autoPaused = false;
+  const result = clockOperation(data, planId, sessionId, at, (w) => {
+    const touched = touchTimer(w.timer, at);
+    autoPaused = touched.autoPaused;
+    return touched.timer ? { timer: touched.timer } : {};
+  });
+  return result.ok ? { ...result, autoPaused } : result;
 }
 
 export type WorkoutFeedback = { completedAt: string; difficulty: Difficulty; pain: boolean; notes: string };
@@ -161,7 +204,17 @@ export function completeTrackedWorkout(data: TrainingData, planId: string, sessi
     data: {
       ...data,
       completions: [...data.completions, completion],
-      workouts: data.workouts.map((w) => (w === workout ? { ...w, status: "completed" as const, completedAt: feedback.completedAt } : w)),
+      workouts: data.workouts.map((w) =>
+        w === workout
+          ? {
+              ...w,
+              status: "completed" as const,
+              completedAt: feedback.completedAt,
+              // The active time, with the clock stopped. Workouts started before timing existed have no clock.
+              ...(w.timer ? { timer: pauseTimer(w.timer, feedback.completedAt), durationSeconds: Math.floor(timerElapsedMs(w.timer, feedback.completedAt) / 1000) } : {}),
+            }
+          : w
+      ),
     },
     completion,
   };
@@ -191,5 +244,8 @@ export const saveWorkoutSet = (planId: string, sessionId: string, entry: { setId
   save((d) => recordWorkoutSet(d, planId, sessionId, { ...entry, completedAt: clock() }));
 export const saveUndoWorkoutSet = (planId: string, sessionId: string, setId: string) => save((d) => undoWorkoutSet(d, planId, sessionId, setId, clock()));
 export const savePainReport = (planId: string, sessionId: string, entry: { setId?: string; notes: string }) => save((d) => reportPain(d, planId, sessionId, { ...entry, reportedAt: clock() }));
+export const savePauseWorkoutClock = (planId: string, sessionId: string) => save((d) => pauseWorkoutClock(d, planId, sessionId, clock()));
+export const saveResumeWorkoutClock = (planId: string, sessionId: string) => save((d) => resumeWorkoutClock(d, planId, sessionId, clock()));
+export const saveWorkoutHeartbeat = (planId: string, sessionId: string) => save((d) => heartbeatWorkoutClock(d, planId, sessionId, clock()));
 export const saveTrackedCompletion = (planId: string, sessionId: string, feedback: Omit<WorkoutFeedback, "completedAt">) =>
   save((d) => completeTrackedWorkout(d, planId, sessionId, { ...feedback, completedAt: clock() }));

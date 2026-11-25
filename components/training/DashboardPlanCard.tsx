@@ -3,18 +3,19 @@
 import Link from "next/link";
 import { formatTestDate } from "@/lib/aft/format";
 import { activePlan, useTrainingData } from "@/lib/storage/trainingPlans";
-import { PAIN_PAUSE_MESSAGE, adherence, compareWithBaseline, currentWeek, nextSession, painReported } from "@/lib/training/progress";
+import { PAIN_PAUSE_MESSAGE, compareWithBaseline } from "@/lib/training/progress";
+import { planDashboard, statusLabels } from "@/lib/training/planDashboard";
 import { formatSignedPoints } from "@/lib/aft/format";
 import { PLAN_WEEKS } from "@/lib/training/templates";
 import { Card } from "@/components/ui/Card";
 import { ButtonLink } from "@/components/ui/Button";
-import { useToday } from "./PlanParts";
+import { useNow } from "./PlanParts";
 
 export default function DashboardPlanCard({ latestResultId }: { latestResultId: string }) {
   const data = useTrainingData();
-  const today = useToday();
+  const now = useNow();
   const plan = activePlan(data);
-  if (!today) return null;
+  if (!now) return null;
 
   if (!plan) {
     return (
@@ -24,11 +25,12 @@ export default function DashboardPlanCard({ latestResultId }: { latestResultId: 
     );
   }
 
-  const stats = adherence(plan, data.completions, today);
-  const week = currentWeek(plan, today);
-  const next = nextSession(plan, data.completions, today);
-  const paused = painReported(plan, data.completions);
-  const thisWeek = stats.weeks.find((w) => w.week === week);
+  // Same source as the plan page: the session status engine. The next workout is the earliest unfinished one, so
+  // an overdue workout is never skipped, and a pause from any pain record shows here.
+  const view = planDashboard(plan, data, now);
+  const { week, next, today } = view;
+  const paused = view.pause.paused;
+  const thisWeek = view.weeks.find((w) => w.week === week);
 
   return (
     <Card
@@ -44,14 +46,14 @@ export default function DashboardPlanCard({ latestResultId }: { latestResultId: 
     >
       <dl className="grid gap-4 sm:grid-cols-3">
         <div>
-          <dt className="text-xs text-ink-2">Completed of scheduled so far</dt>
+          <dt className="text-xs text-ink-2">Plan completed</dt>
           <dd className="text-2xl font-semibold text-ink">
-            {stats.completedOfScheduled} / {stats.scheduledToDate}
+            {view.overall.completed} / {view.overall.total} <span className="text-sm font-normal text-ink-2">· {view.overall.percent}%</span>
           </dd>
         </div>
         <div>
           <dt className="text-xs text-ink-2">This week</dt>
-          <dd className="text-2xl font-semibold text-ink">{thisWeek ? `${thisWeek.completed} / ${thisWeek.scheduled}` : "—"}</dd>
+          <dd className="text-2xl font-semibold text-ink">{thisWeek ? `${thisWeek.completed} / ${thisWeek.total}` : "—"}</dd>
         </div>
         <div>
           <dt className="text-xs text-ink-2">{paused ? "Plan status" : "Next workout"}</dt>
@@ -62,11 +64,11 @@ export default function DashboardPlanCard({ latestResultId }: { latestResultId: 
               <>
                 <span className="font-semibold">{next.session.title}</span>
                 <span className="block text-ink-2">
-                  {next.date === today ? "Today" : formatTestDate(next.date)} · about {next.session.estimatedMinutes} min
+                  {next.date === today ? "Today" : formatTestDate(next.date)} · {statusLabels[next.status]}
                 </span>
               </>
             ) : (
-              "No upcoming sessions"
+              "Every workout is completed"
             )}
           </dd>
         </div>

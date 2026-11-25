@@ -24,8 +24,8 @@ import {
 } from "@/lib/aft/format";
 import { useAftResults, useHydrated } from "@/lib/storage/aftResults";
 import { useSettings } from "@/lib/storage/settings";
-import { activePlan, useTrainingData } from "@/lib/storage/trainingPlans";
-import { painReported } from "@/lib/training/progress";
+import { activePlan, safetyRecords, useTrainingData } from "@/lib/storage/trainingPlans";
+import { planPaused as isPlanPaused } from "@/lib/training/workout";
 import { Card, PageHeader } from "@/components/ui/Card";
 import { ButtonLink, segmentClass, segmentGroupClass } from "@/components/ui/Button";
 import { fieldFocus } from "@/components/ui/form";
@@ -99,7 +99,7 @@ export default function Dashboard() {
   const { latest } = summary;
   // A plan paused by a pain report doesn't offer starting another plan here; the plan page explains the pause.
   const plan = activePlan(training);
-  const planPaused = plan !== null && painReported(plan, training.completions);
+  const planPaused = plan !== null && isPlanPaused(plan.id, safetyRecords(training));
   const latestResult = latest.record.result;
   const comparable = latest.previousComparable
     ? progress.find((item) => item.record.id === latest.previousComparable!.id)

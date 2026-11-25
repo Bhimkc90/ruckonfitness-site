@@ -16,6 +16,17 @@ export function useToday(): string | null {
   return useSyncExternalStore(noopSubscribe, localToday, () => null);
 }
 
+// The current time, to the minute, once the browser has hydrated; null during server rendering. It updates each
+// minute so a workout unlocks on its date without a reload. Display only: saving reads the clock itself.
+const minuteNow = () => new Date(Math.floor(Date.now() / 60_000) * 60_000).toISOString();
+const minuteSubscribe = (onChange: () => void) => {
+  const timer = window.setInterval(onChange, 30_000);
+  return () => window.clearInterval(timer);
+};
+export function useNow(): string | null {
+  return useSyncExternalStore(minuteSubscribe, minuteNow, () => null);
+}
+
 export function formatPrescription(p: Prescription): string {
   return [p.sets && formatSets(p.sets), p.reps && formatReps(p.reps), p.time, p.rest && `rest ${p.rest}`, p.intensity, p.notes]
     .filter(Boolean)

@@ -1,4 +1,5 @@
 import { WORKOUT_SCHEMA_VERSION, trackableSetIds, validateActual, workoutSetIds } from "@/lib/training/workout";
+import { MAX_WORKOUT_MS } from "@/lib/training/workoutTimer";
 import type {
   PlanBlock,
   PlanItem,
@@ -149,10 +150,22 @@ export function validSnapshot(s: unknown, plan: StoredPlan): s is WorkoutSnapsho
   return new Set(ids).size === ids.length;
 }
 
+// The workout clock: active time within a day, a running segment only on an open workout, and times in order.
+function validTimer(t: unknown, startedAt: string, completed: boolean): boolean {
+  if (!isObject(t) || !keysWithin(t, ["elapsedMs", "runningSince", "lastSeenAt"]) || !isCount(t.elapsedMs, 0, MAX_WORKOUT_MS)) return false;
+  if (t.runningSince === undefined) return t.lastSeenAt === undefined;
+  if (completed || !isTimestamp(t.runningSince) || t.runningSince < startedAt) return false;
+  return t.lastSeenAt === undefined || (isTimestamp(t.lastSeenAt) && t.lastSeenAt >= t.runningSince);
+}
+
 export function validStoredWorkout(w: unknown, plan: StoredPlan): w is StoredWorkout {
-  if (!isObject(w) || !keysWithin(w, ["planId", "sessionId", "status", "startedAt", "completedAt", "snapshot"])) return false;
+  if (!isObject(w) || !keysWithin(w, ["planId", "sessionId", "status", "startedAt", "completedAt", "snapshot", "timer", "durationSeconds"])) return false;
   if (w.planId !== plan.id || !isId(w.sessionId) || !isTimestamp(w.startedAt)) return false;
-  if (w.status === "completed" ? !isTimestamp(w.completedAt) || (w.completedAt as string) < (w.startedAt as string) : w.status !== "in-progress" || w.completedAt !== undefined) return false;
+  const completed = w.status === "completed";
+  if (completed ? !isTimestamp(w.completedAt) || (w.completedAt as string) < (w.startedAt as string) : w.status !== "in-progress" || w.completedAt !== undefined) return false;
+  // Both timing fields are optional so workouts saved before timing existed stay valid.
+  if (w.timer !== undefined && !validTimer(w.timer, w.startedAt, completed)) return false;
+  if (w.durationSeconds !== undefined && !(completed && isCount(w.durationSeconds, 0, MAX_WORKOUT_MS / 1000))) return false;
   return validSnapshot(w.snapshot, plan) && w.snapshot.sessionId === w.sessionId && w.snapshot.createdAt === w.startedAt;
 }
 

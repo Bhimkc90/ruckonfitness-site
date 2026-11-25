@@ -2,60 +2,77 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, ClipboardPlus, Info, Link2, Minus, PauseCircle, RotateCcw } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
+  Ban,
+  CheckCircle2,
+  CircleDot,
+  Clock,
+  ClipboardPlus,
+  Info,
+  Link2,
+  Lock,
+  Minus,
+  Moon,
+  PauseCircle,
+  PlayCircle,
+  RotateCcw,
+  Square,
+  Timer,
+} from "lucide-react";
 import { aftEventInfo } from "@/lib/aft/scoring";
 import { describeCategory, formatInstantDate, formatRaw, formatSignedPoints, formatTestDate } from "@/lib/aft/format";
 import { categoryOf } from "@/lib/aft/progress";
 import { useAftResults, useHydrated, type SavedAftResult } from "@/lib/storage/aftResults";
 import {
   activePlan,
-  completeSession,
+  commitTrainingData,
   endPlan,
   linkReassessment,
   rescheduleSession,
   undoCompletion,
+  undoCompletionBlock,
   unlinkReassessment,
   updateTrainingData,
   useTrainingData,
+  type TrainingData,
 } from "@/lib/storage/trainingPlans";
-import { weekWindow, weekdayLabels, weekdayOf } from "@/lib/training/engine";
 import {
-  adherence,
-  compareWithBaseline,
-  PAIN_PAUSE_MESSAGE,
-  currentWeek,
-  firstPainReport,
-  nextSession,
-  planCompletions,
-  progressionHeld,
-  earlierRecords,
-  reassessmentCandidates,
-  sessionsByDate,
-} from "@/lib/training/progress";
+  savePainReport,
+  savePauseWorkoutClock,
+  saveResumeWorkoutClock,
+  saveStartOrResumeWorkout,
+  saveTrackedCompletion,
+  saveUndoWorkoutSet,
+  saveWorkoutHeartbeat,
+  saveWorkoutSet,
+} from "@/lib/storage/workouts";
+import { weekWindow, weekdayLabels, weekdayOf } from "@/lib/training/engine";
+import { PAIN_PAUSE_MESSAGE, compareWithBaseline, reassessmentCandidates } from "@/lib/training/progress";
+import { planDashboard, sessionActions, statusLabels, workoutView, type DayEntry, type PlanDashboard, type SessionProgress } from "@/lib/training/planDashboard";
+import type { SessionStatus } from "@/lib/training/sessionStatus";
 import { PLAN_WEEKS } from "@/lib/training/templates";
-import type { Difficulty, PlanSession, SessionCompletion, StoredPlan } from "@/lib/training/types";
+import type { SessionCompletion, StoredPlan } from "@/lib/training/types";
 import { Card, PageHeader } from "@/components/ui/Card";
 import { ButtonLink, buttonClass } from "@/components/ui/Button";
 import { Chip, PassFailBadge } from "@/components/ui/StatusBadge";
-import { PlanDisclaimer, useToday } from "./PlanParts";
-import { FocusCard, NotesCard, SessionBody } from "./PlanPreview";
+import { PlanDisclaimer, useNow, useToday } from "./PlanParts";
+import { FocusCard, NotesCard } from "./PlanPreview";
 import { inputClass } from "@/components/ui/form";
-
-const difficultyLabels: Record<Difficulty, string> = {
-  easy: "Easy",
-  "about-right": "About right",
-  hard: "Hard",
-  "too-hard": "Too hard",
-};
+import WorkoutSession, { PainReportForm, ProgressBar, difficultyLabels, type ActionResult, type WorkoutActions } from "./WorkoutSession";
+import type { ClockActions } from "./WorkoutTimers";
 
 export default function PlanView() {
   const hydrated = useHydrated();
   const today = useToday();
+  const now = useNow();
   const data = useTrainingData();
   const results = useAftResults();
   const plan = activePlan(data);
 
-  if (!hydrated || !today) return <div className="h-40 rounded-xl border border-card-line bg-surface shadow-sm" aria-busy="true" aria-label="Loading plan" />;
+  if (!hydrated || !today || !now) return <div className="h-40 rounded-xl border border-card-line bg-surface shadow-sm" aria-busy="true" aria-label="Loading plan" />;
 
   if (!plan) {
     const ended = data.plans.filter((p) => p.status === "ended").length;
@@ -82,33 +99,78 @@ export default function PlanView() {
 
   return (
     <div className="space-y-5">
-      <ActivePlan plan={plan} completions={data.completions} today={today} results={results} />
+      <ActivePlan plan={plan} data={data} now={now} results={results} />
       <EarlierPlans plans={data.plans.filter((p) => p.status === "ended")} completions={data.completions} />
     </div>
   );
 }
 
-function ActivePlan({ plan, completions, today, results }: { plan: StoredPlan; completions: SessionCompletion[]; today: string; results: SavedAftResult[] }) {
-  const [message, setMessage] = useState("");
-  const done = planCompletions(plan, completions);
-  const stats = adherence(plan, completions, today);
-  const next = nextSession(plan, completions, today);
-  const week = currentWeek(plan, today);
-  const painReport = firstPainReport(plan, completions);
-  const paused = painReport !== null;
-  const dated = sessionsByDate(plan);
+// Everything below reads the session status engine through planDashboard and workoutView; no eligibility rule
+// is decided here. Every change goes through the storage save functions, which read the device clock themselves.
+
+const toResult = (r: { ok: boolean; error?: string }): ActionResult => (r.ok ? { ok: true } : { ok: false, error: r.error ?? "Not saved." });
+
+const statusIcons: Record<SessionStatus, typeof Lock> = {
+  upcoming: Clock,
+  available: PlayCircle,
+  "in-progress": Timer,
+  completed: CheckCircle2,
+  locked: Lock,
+  overdue: AlertTriangle,
+  paused: PauseCircle,
+  ended: Square,
+  blocked: Ban,
+};
+
+const statusTone: Record<SessionStatus, string> = {
+  upcoming: "bg-surface-2 text-ink-2",
+  available: "bg-accent text-black",
+  "in-progress": "bg-accent/30 text-ink",
+  completed: "bg-good/10 text-good",
+  locked: "bg-surface-2 text-ink-2",
+  overdue: "border border-warn bg-accent/10 text-ink",
+  paused: "bg-bad/10 text-bad",
+  ended: "bg-surface-2 text-ink-2",
+  blocked: "bg-bad/10 text-bad",
+};
+
+// Status always shows an icon and a word, never color alone.
+function StatusBadge({ status }: { status: SessionStatus }) {
+  const Icon = statusIcons[status];
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${statusTone[status]}`}>
+      <Icon className="h-3.5 w-3.5" aria-hidden />
+      {statusLabels[status]}
+    </span>
+  );
+}
+
+function progressText(p: SessionProgress): string | null {
+  if (p.kind === "tracked") return `${p.completed} of ${p.total} done${p.percent === null ? "" : ` · ${p.percent}%`}`;
+  if (p.kind === "untracked") return "Recorded without set tracking";
+  return null;
+}
+
+const dayLabel = (date: string) => `${weekdayLabels[weekdayOf(date)]} ${formatTestDate(date, "short")}`;
+
+// Exported for rendering tests.
+export function ActivePlan({ plan, data, now, results }: { plan: StoredPlan; data: TrainingData; now: string; results: SavedAftResult[] }) {
+  const view = planDashboard(plan, data, now);
+  const { pause, next } = view;
   const aftDate = plan.preferences.nextAftDate;
+  // Pain can be reported at any time; it is filed against the session in hand (or the last one when all are done).
+  const painSession = next?.sessionId ?? view.state.sessions.at(-1)!.sessionId;
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Training plan"
         description={`Four-week starter plan from ${formatTestDate(plan.startDate)} · ${
-          paused ? "paused after a pain report" : week <= PLAN_WEEKS ? `week ${week} of ${PLAN_WEEKS}` : "finished"
+          pause.paused ? "paused after a pain report" : view.week <= PLAN_WEEKS ? `week ${view.week} of ${PLAN_WEEKS}` : "finished"
         }`}
         actions={
           <>
-            {!paused && (
+            {!pause.paused && (
               <ButtonLink href="/training-plan/new" variant="secondary">
                 New plan
               </ButtonLink>
@@ -117,7 +179,7 @@ function ActivePlan({ plan, completions, today, results }: { plan: StoredPlan; c
               type="button"
               className={buttonClass("ghost")}
               onClick={() => {
-                if (window.confirm("End this plan? Its completion history stays in this browser.")) updateTrainingData((d) => endPlan(d, plan.id));
+                if (window.confirm("End this plan? Its workouts and history stay in this browser.")) updateTrainingData((d) => endPlan(d, plan.id));
               }}
             >
               End plan
@@ -128,128 +190,72 @@ function ActivePlan({ plan, completions, today, results }: { plan: StoredPlan; c
 
       <PlanDisclaimer />
 
-      {paused && (
-        <div role="alert" className="flex gap-2 rounded-lg border border-bad/40 bg-bad/5 p-3 text-sm text-ink">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-bad" aria-hidden />
+      {pause.paused && (
+        <div role="alert" className="flex gap-2 rounded-lg border-2 border-bad bg-bad/5 p-4 text-sm text-ink">
+          <PauseCircle className="mt-0.5 h-5 w-5 shrink-0 text-bad" aria-hidden />
           <div>
-            <p className="font-semibold">Plan paused</p>
+            <p className="text-base font-semibold">Plan paused{pause.since ? ` since ${formatInstantDate(pause.since)}` : ""}</p>
             <p className="mt-0.5">{PAIN_PAUSE_MESSAGE}</p>
-            <p className="mt-1 text-ink-2">Your sessions and recorded workouts stay below for reference.</p>
+            <p className="mt-1 text-ink-2">No workout can be started, continued, completed, or moved. Your workouts and recorded sets stay below for reference.</p>
           </div>
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <p className="text-sm text-ink-2">Completed so far</p>
-          <p className="mt-1 text-3xl font-semibold text-ink">
-            {stats.completedOfScheduled} <span className="text-base font-normal text-ink-2">of {stats.scheduledToDate} scheduled</span>
-          </p>
-          <p className="mt-1 text-xs text-ink-2">
-            {stats.completed} of {stats.total} sessions in the plan recorded
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm text-ink-2">Weekly adherence</p>
-          <ul className="mt-2 space-y-1 text-sm tabular-nums">
-            {stats.weeks.map((w) => (
-              <li key={w.week} className="flex justify-between">
-                <span className={w.week === week ? "font-semibold text-ink" : "text-ink-2"}>Week {w.week}</span>
-                <span className="text-ink">
-                  {w.completed} / {w.scheduled}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-        <Card>
-          <p className="text-sm text-ink-2">{paused ? "Plan status" : "Next workout"}</p>
-          {paused ? (
-            <>
-              <p className="mt-1 flex items-center gap-1.5 font-semibold text-ink">
-                <PauseCircle className="h-4 w-4 text-bad" aria-hidden />
-                Paused
-              </p>
-              <p className="text-sm text-ink-2">Pain reported {formatInstantDate(painReport.completedAt)}. No workout is suggested while the plan is paused.</p>
-            </>
-          ) : next ? (
-            <>
-              <p className="mt-1 font-semibold text-ink">{next.session.title}</p>
-              <p className="text-sm text-ink-2">
-                {next.date === today ? "Today" : formatTestDate(next.date)} · about {next.session.estimatedMinutes} min
-              </p>
-              <a href={`#session-${next.session.id}`} className="mt-2 inline-block text-sm font-medium text-accent-ink hover:underline">
-                Open workout
-              </a>
-            </>
-          ) : (
-            <p className="mt-1 text-sm text-ink">No upcoming sessions. {plan.reassessment}</p>
-          )}
-        </Card>
-      </div>
+      <PlanOverview plan={plan} view={view} painSession={painSession} />
 
-      {message && (
-        <p role="status" className="text-sm text-bad">
-          {message}
-        </p>
-      )}
-
-      {week > PLAN_WEEKS && !plan.reassessmentLink && (
+      {view.week > PLAN_WEEKS && !plan.reassessmentLink && (
         <p role="status" className="flex gap-2 rounded-lg border border-accent bg-accent/10 p-3 text-sm text-ink">
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           The four weeks are over. Record a practice AFT, then link it below to compare it with your baseline.
         </p>
       )}
 
-      {Array.from({ length: PLAN_WEEKS }, (_, i) => i + 1).map((w) => {
-        const held = progressionHeld(plan, completions, w);
-        const records = earlierRecords(plan, completions, w);
-        const range = weekWindow(plan.startDate, w);
-        return (
-          <section key={w} aria-labelledby={`week-${w}`} className="rounded-xl border border-card-line bg-surface shadow-sm p-4 sm:p-5">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 id={`week-${w}`} className="text-base font-semibold text-ink">
-                Week {w} <span className="font-normal text-ink-2">· {w <= 2 ? "Foundation" : held ? "Holding at the foundation level" : "Build"}</span>
-              </h2>
-              <span className="text-xs text-ink-2">
-                {formatTestDate(range.from, "short")} – {formatTestDate(range.to, "short")}
-              </span>
-            </div>
-            {held && (
-              <p className="mt-2 flex gap-1.5 text-xs text-ink-2">
-                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-                An earlier session was rated too hard or painful, so this week repeats the week 1–2 workload.
-              </p>
+      {view.weeks.map((w) => (
+        <section key={w.week} aria-labelledby={`week-${w.week}`} className="rounded-xl border border-card-line bg-surface p-4 shadow-sm sm:p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id={`week-${w.week}`} className="text-base font-semibold text-ink">
+              Week {w.week}{" "}
+              <span className="font-normal text-ink-2">· {w.phase === "foundation" ? "Foundation" : w.phase === "held" ? "Holding at the foundation level" : "Build"}</span>
+            </h2>
+            <span className="text-xs text-ink-2">
+              {formatTestDate(w.from, "short")} – {formatTestDate(w.to, "short")}
+            </span>
+          </div>
+          <div className="mt-2 max-w-sm">
+            <ProgressBar percent={w.percent} label={`${w.completed} of ${w.total} workouts completed`} />
+          </div>
+          {w.phase === "held" && (
+            <p className="mt-2 flex gap-1.5 text-xs text-ink-2">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+              An earlier session was rated too hard or painful, so this week repeats the week 1–2 workload.
+            </p>
+          )}
+          <ul className="mt-3 space-y-2">
+            {w.days.map((day) =>
+              day.kind === "rest" ? (
+                <li key={day.date} className="flex items-center gap-2 rounded-lg border border-dashed border-line px-3 py-2 text-sm text-ink-2">
+                  <Moon className="h-4 w-4 shrink-0" aria-hidden />
+                  <span>
+                    {dayLabel(day.date)} · Rest day{day.date === view.today ? " (today)" : ""}
+                  </span>
+                </li>
+              ) : (
+                <SessionRow
+                  key={day.state.sessionId}
+                  plan={plan}
+                  data={data}
+                  now={now}
+                  entry={day}
+                  isNext={next?.sessionId === day.state.sessionId}
+                  isToday={day.date === view.today}
+                  afterAft={!!aftDate && day.date > aftDate}
+                  onAftDay={aftDate === day.date}
+                />
+              )
             )}
-            {w >= 3 && !held && records.recorded < records.total && (
-              <p className="mt-2 flex gap-1.5 text-xs text-ink-2">
-                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-                {records.recorded} of {records.total} earlier sessions are recorded. The build level is shown because no recorded session was
-                rated too hard or painful; sessions without a record don&apos;t show that you&apos;re ready for more. This rule is waiting for review.
-              </p>
-            )}
-            <ul className="mt-3 space-y-3">
-              {dated
-                .filter((d) => d.session.week === w)
-                .map(({ session, date }) => (
-                  <SessionRow
-                    key={session.id}
-                    plan={plan}
-                    session={session}
-                    date={date}
-                    today={today}
-                    completion={done.get(session.id)}
-                    useBuild={w >= 3 && !held}
-                    paused={paused}
-                    afterAft={!!aftDate && date > aftDate}
-                    onAftDay={aftDate === date}
-                    onError={setMessage}
-                  />
-                ))}
-            </ul>
-          </section>
-        );
-      })}
+          </ul>
+        </section>
+      ))}
 
       <ReassessmentCard plan={plan} results={results} />
 
@@ -258,6 +264,285 @@ function ActivePlan({ plan, completions, today, results }: { plan: StoredPlan; c
         <NotesCard plan={plan} />
       </div>
     </div>
+  );
+}
+
+function PlanOverview({ plan, view, painSession }: { plan: StoredPlan; view: PlanDashboard; painSession: string }) {
+  const { next, overall, pause } = view;
+  const thisWeek = view.weeks.find((w) => w.week === view.week);
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 [&>*]:min-w-0">
+      <Card>
+        <p className="text-sm text-ink-2">Today · {dayLabel(view.today)}</p>
+        <p className="mt-1 text-xl font-semibold text-ink">{view.week <= PLAN_WEEKS ? `Week ${view.week} of ${PLAN_WEEKS}` : "Plan weeks finished"}</p>
+        {view.todaySessions.length ? (
+          <ul className="mt-2 space-y-1 text-sm">
+            {view.todaySessions.map((s) => (
+              <li key={s.sessionId} className="flex flex-wrap items-center gap-2">
+                <span className="text-ink">Workout day: {s.session.title}</span>
+                <StatusBadge status={s.status} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-2">
+            <Moon className="h-4 w-4" aria-hidden />
+            No workout scheduled today.
+          </p>
+        )}
+      </Card>
+      <Card>
+        <p className="text-sm text-ink-2">Plan progress</p>
+        <p className="mt-1 text-xl font-semibold text-ink">
+          {overall.completed} <span className="text-base font-normal text-ink-2">completed · {overall.remaining} remaining</span>
+        </p>
+        <div className="mt-2">
+          <ProgressBar percent={overall.percent} label={`${overall.completed} of ${overall.total} workouts`} />
+        </div>
+      </Card>
+      <Card>
+        <p className="text-sm text-ink-2">Weekly progress</p>
+        <ul className="mt-2 space-y-1 text-sm tabular-nums">
+          {view.weeks.map((w) => (
+            <li key={w.week} className="flex justify-between gap-2">
+              <span className={w.week === thisWeek?.week ? "font-semibold text-ink" : "text-ink-2"}>Week {w.week}</span>
+              <span className="text-ink">
+                {w.completed} / {w.total} · {w.percent}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <Card>
+        <p className="text-sm text-ink-2">{pause.paused ? "Plan status" : "Next workout"}</p>
+        {pause.paused ? (
+          <p className="mt-1 flex items-center gap-1.5 font-semibold text-ink">
+            <PauseCircle className="h-4 w-4 text-bad" aria-hidden />
+            Paused. No workout is suggested.
+          </p>
+        ) : next ? (
+          <>
+            <p className="mt-1 font-semibold text-ink">{next.session.title}</p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-ink-2">
+              {next.date === view.today ? "Today" : formatTestDate(next.date)} · about {next.session.estimatedMinutes} min <StatusBadge status={next.status} />
+            </p>
+            {next.reasons.map((r) => (
+              <p key={r} className="mt-1 text-xs text-ink-2">
+                {r}
+              </p>
+            ))}
+            <a href={`#session-${next.sessionId}`} className="mt-2 inline-block text-sm font-medium text-accent-ink hover:underline">
+              Go to workout
+            </a>
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-ink">Every workout is completed. {plan.reassessment}</p>
+        )}
+        <div className="mt-3">
+          <PainReportForm compact onReport={(notes) => toResult(savePainReport(plan.id, painSession, { notes }))} />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function SessionRow({
+  plan,
+  data,
+  now,
+  entry,
+  isNext,
+  isToday,
+  afterAft,
+  onAftDay,
+}: {
+  plan: StoredPlan;
+  data: TrainingData;
+  now: string;
+  entry: Extract<DayEntry, { kind: "session" }>;
+  isNext: boolean;
+  isToday: boolean;
+  afterAft: boolean;
+  onAftDay: boolean;
+}) {
+  const { state, progress } = entry;
+  const sessionId = state.sessionId;
+  const view = workoutView(plan, data, state, now);
+  const allowed = sessionActions(state, view);
+  const [open, setOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [message, setMessage] = useState<{ tone: "error" | "warning"; text: string } | null>(null);
+  const [moveTo, setMoveTo] = useState(state.date);
+  const range = weekWindow(plan.startDate, state.session.week);
+  const progressLabel = progressText(progress);
+
+  const begin = () => {
+    const result = saveStartOrResumeWorkout(plan.id, sessionId);
+    if (!result.ok) return setMessage({ tone: "error", text: result.error });
+    // Coming back to a workout restarts its clock if it was paused (or left and auto-paused).
+    if (result.resumed) {
+      const clockResult = saveResumeWorkoutClock(plan.id, sessionId);
+      if (!clockResult.ok) return setMessage({ tone: "error", text: clockResult.error });
+    }
+    setMessage(null);
+    setNotice(result.notice ?? "");
+    setOpen(true);
+  };
+
+  const clock: ClockActions = {
+    pause: () => toResult(savePauseWorkoutClock(plan.id, sessionId)),
+    resume: () => toResult(saveResumeWorkoutClock(plan.id, sessionId)),
+    heartbeat: () => {
+      const r = saveWorkoutHeartbeat(plan.id, sessionId);
+      return r.ok ? { ok: true, autoPaused: r.autoPaused } : { ok: false, error: r.error };
+    },
+  };
+
+  const actions: WorkoutActions = {
+    recordSet: (setId, actual) => toResult(saveWorkoutSet(plan.id, sessionId, { setId, ...(actual ? { actual } : {}) })),
+    undoSet: (setId) => toResult(saveUndoWorkoutSet(plan.id, sessionId, setId)),
+    complete: (feedback) => toResult(saveTrackedCompletion(plan.id, sessionId, { ...feedback, pain: false })),
+    reportPain: (e) => toResult(savePainReport(plan.id, sessionId, { notes: e.notes, ...(e.setId ? { setId: e.setId } : {}) })),
+  };
+
+  const move = () => {
+    let warning: string | undefined;
+    const result = commitTrainingData<object>((d) => {
+      const moved = rescheduleSession(d, plan.id, sessionId, moveTo);
+      warning = moved.warning;
+      return moved.error ? { ok: false as const, error: moved.error } : { ok: true as const, data: moved.data };
+    });
+    setMessage(!result.ok ? { tone: "error", text: result.error } : warning ? { tone: "warning", text: warning } : null);
+  };
+
+  const undoBlock = view.mode === "history" || view.mode === "untracked" ? undoCompletionBlock(data, plan.id, sessionId) : null;
+  const undo = () => {
+    const result = commitTrainingData<object>((d) => {
+      const block = undoCompletionBlock(d, plan.id, sessionId);
+      return block ? { ok: false as const, error: block } : { ok: true as const, data: undoCompletion(d, plan.id, sessionId) };
+    });
+    setMessage(result.ok ? null : { tone: "error", text: result.error });
+  };
+
+  const muted = state.status === "locked" || state.status === "upcoming" || state.status === "ended";
+
+  return (
+    <li id={`session-${sessionId}`} className={`scroll-mt-28 rounded-lg border p-3 lg:scroll-mt-6 ${isNext ? "border-ink" : "border-line"} ${muted ? "bg-surface-2/60" : "bg-canvas/40"}`}>
+      <details open={isNext && (state.eligible || state.status === "in-progress")}>
+        <summary className="flex min-h-11 cursor-pointer flex-wrap items-center justify-between gap-2">
+          <span className="min-w-0">
+            <span className={`text-sm font-medium ${muted ? "text-ink-2" : "text-ink"}`}>
+              {dayLabel(state.date)}
+              {isToday ? " (today)" : ""} · {state.session.title}
+            </span>
+            <span className="block text-xs text-ink-2">
+              about {state.session.estimatedMinutes} min{progressLabel ? ` · ${progressLabel}` : ""}
+              {isNext && " · next workout"}
+              {afterAft ? " · after your AFT date" : ""}
+              {onAftDay && <span className="font-semibold text-warn"> · on your AFT day</span>}
+            </span>
+          </span>
+          <StatusBadge status={state.status} />
+        </summary>
+
+        <div className="mt-3 space-y-3">
+          {state.reasons.length > 0 && (
+            <ul className="space-y-1 rounded-lg border border-line bg-surface p-2.5 text-sm text-ink">
+              {state.reasons.map((r) => (
+                <li key={r} className="flex gap-1.5">
+                  {state.status === "locked" || state.status === "upcoming" ? (
+                    <Lock className="mt-0.5 h-4 w-4 shrink-0 text-ink-2" aria-hidden />
+                  ) : (
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-ink-2" aria-hidden />
+                  )}
+                  {r}
+                </li>
+              ))}
+            </ul>
+          )}
+          {state.warnings.map((w) => (
+            <p key={w} className="flex gap-1.5 rounded-lg border border-warn/60 bg-accent/10 p-2.5 text-sm text-ink">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+              {w}
+            </p>
+          ))}
+          <p className="text-sm text-ink-2">{state.session.purpose}</p>
+
+          {(allowed.start || allowed.resume) && !(open && view.mode === "active") && (
+            <button type="button" onClick={begin} className={buttonClass("primary", "min-h-11")}>
+              <PlayCircle className="h-4 w-4" aria-hidden />
+              {allowed.resume ? "Resume workout" : "Start workout"}
+            </button>
+          )}
+
+          {message && (
+            <p role={message.tone === "error" ? "alert" : "status"} className={`text-sm font-medium ${message.tone === "error" ? "text-bad" : "text-warn"}`}>
+              {message.text}
+            </p>
+          )}
+
+          {view.mode === "active" && open && <WorkoutSession view={view} actions={actions} clock={clock} notice={notice} />}
+          {view.mode === "stored" && <WorkoutSession view={view} reasons={state.reasons} />}
+          {view.mode === "history" && <WorkoutSession view={view} />}
+          {view.mode === "untracked" && (
+            <div className="rounded-lg border border-line p-3 text-sm">
+              <p className="flex items-center gap-1.5 font-medium text-ink">
+                <CheckCircle2 className="h-4 w-4 text-good" aria-hidden />
+                Recorded {formatInstantDate(view.completion.completedAt)} · {difficultyLabels[view.completion.difficulty]}
+                {view.completion.pain ? " · pain reported" : ""}
+              </p>
+              <p className="mt-1 text-xs text-ink-2">Recorded before workouts were tracked set by set, so there are no set records.</p>
+              {view.completion.notes && <p className="mt-1 text-ink-2">{view.completion.notes}</p>}
+            </div>
+          )}
+          {view.mode === "preview" && (
+            // Rendered only once opened, so twelve full previews don't sit hidden in the page.
+            <details className="rounded-lg border border-line p-3" onToggle={(e) => setPreviewOpen(e.currentTarget.open)}>
+              <summary className="flex min-h-11 cursor-pointer items-center gap-1.5 text-sm font-medium text-ink">
+                <CircleDot className="h-4 w-4" aria-hidden />
+                Preview exercises
+              </summary>
+              {previewOpen && (
+                <div className="mt-3">
+                  <WorkoutSession view={view} reasons={state.reasons} onStart={allowed.start ? begin : undefined} />
+                </div>
+              )}
+            </details>
+          )}
+
+          {(view.mode === "history" || view.mode === "untracked") &&
+            (undoBlock ? (
+              <p className="text-xs text-ink-2">Can&apos;t undo: {undoBlock}</p>
+            ) : (
+              <button type="button" onClick={undo} className={buttonClass("ghost", "px-2 py-1")}>
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                {view.mode === "history" ? "Undo completion and reopen workout" : "Undo completion"}
+              </button>
+            ))}
+
+          {allowed.reschedule && (
+            <div className="flex flex-wrap items-end gap-2 text-sm">
+              <label className="block">
+                <span className="text-xs text-ink-2">Move within week {state.session.week}</span>
+                <input
+                  type="date"
+                  value={moveTo}
+                  min={range.from}
+                  max={range.to}
+                  onChange={(e) => setMoveTo(e.target.value)}
+                  className="mt-1 block rounded-lg border border-line-strong bg-canvas px-3 py-1.5 text-sm text-ink"
+                />
+              </label>
+              <button type="button" onClick={move} disabled={moveTo === state.date} className={buttonClass("secondary", "min-h-11 py-1.5")}>
+                Reschedule
+              </button>
+              <Chip>Workouts stay in order</Chip>
+            </div>
+          )}
+        </div>
+      </details>
+    </li>
   );
 }
 
@@ -430,162 +715,5 @@ function EarlierPlans({ plans, completions }: { plans: StoredPlan[]; completions
         })}
       </ul>
     </Card>
-  );
-}
-
-function SessionRow({
-  plan,
-  session,
-  date,
-  today,
-  completion,
-  useBuild,
-  paused,
-  afterAft,
-  onAftDay,
-  onError,
-}: {
-  plan: StoredPlan;
-  session: PlanSession;
-  date: string;
-  today: string;
-  completion?: SessionCompletion;
-  useBuild: boolean;
-  paused: boolean;
-  afterAft: boolean;
-  onAftDay: boolean;
-  onError: (message: string) => void;
-}) {
-  const [difficulty, setDifficulty] = useState<Difficulty | "">("");
-  const [pain, setPain] = useState(false);
-  const [notes, setNotes] = useState("");
-  const [moveTo, setMoveTo] = useState(date);
-  const range = weekWindow(plan.startDate, session.week);
-  const status = completion ? "Completed" : date < today ? "Not recorded" : paused ? "Paused" : date === today ? "Today" : "Upcoming";
-
-  const save = () => {
-    if (!difficulty) return;
-    const result = updateTrainingData((d) =>
-      completeSession(d, { planId: plan.id, sessionId: session.id, completedAt: new Date().toISOString(), difficulty, pain, notes })
-    );
-    if (!result.ok) onError(result.error);
-  };
-
-  const move = () => {
-    let error: string | undefined;
-    let warning: string | undefined;
-    const result = updateTrainingData((d) => {
-      const moved = rescheduleSession(d, plan.id, session.id, moveTo);
-      error = moved.error;
-      warning = moved.warning;
-      return moved.data;
-    });
-    onError(error ?? warning ?? (result.ok ? "" : result.error));
-  };
-
-  return (
-    <li id={`session-${session.id}`} className="scroll-mt-28 rounded-lg border border-line bg-canvas/40 p-3 lg:scroll-mt-6">
-      <details open={date === today && !completion && !paused}>
-        <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2">
-          <span>
-            <span className="text-sm font-medium text-ink">
-              {weekdayLabels[weekdayOf(date)]} {formatTestDate(date, "short")} · {session.title}
-            </span>
-            <span className="block text-xs text-ink-2">
-              about {session.estimatedMinutes} min{afterAft ? " · after your AFT date" : ""}
-              {onAftDay && <span className="font-semibold text-warn"> · on your AFT day: skip it or move it</span>}
-            </span>
-          </span>
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-              completion ? "bg-good/10 text-good" : status === "Today" ? "bg-accent/15 text-accent-ink" : "bg-surface-2 text-ink-2"
-            }`}
-          >
-            {completion && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />}
-            {status}
-          </span>
-        </summary>
-
-        <div className="mt-3 space-y-4">
-          <SessionBody session={session} useBuild={useBuild} restrictions={plan.preferences.restrictions} equipment={plan.preferences.equipment} />
-
-          {completion ? (
-            <div className="rounded-lg border border-line p-3 text-sm">
-              <p className="text-ink">
-                Recorded {formatInstantDate(completion.completedAt)} · {difficultyLabels[completion.difficulty]}
-                {completion.pain ? " · pain reported" : ""}
-              </p>
-              {completion.notes && <p className="mt-1 text-ink-2">{completion.notes}</p>}
-              <button
-                type="button"
-                className={buttonClass("ghost", "mt-2 px-2 py-1")}
-                onClick={() => updateTrainingData((d) => undoCompletion(d, plan.id, session.id))}
-              >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-                Undo completion
-              </button>
-            </div>
-          ) : paused ? (
-            <p className="rounded-lg border border-line p-3 text-sm text-ink-2">
-              Paused after a pain report. New sessions can&apos;t be recorded or moved while the plan is paused.
-            </p>
-          ) : (
-            <div className="rounded-lg border border-line p-3">
-              <fieldset className="text-sm">
-                <legend className="font-medium text-ink">How hard was this session?</legend>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(Object.keys(difficultyLabels) as Difficulty[]).map((d) => (
-                    <label key={d} className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 ${difficulty === d ? "border-accent" : "border-line"}`}>
-                      <input type="radio" name={`difficulty-${session.id}`} checked={difficulty === d} onChange={() => setDifficulty(d)} className="accent-[var(--color-control)]" />
-                      {difficultyLabels[d]}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <label className="mt-3 flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={pain} onChange={() => setPain(!pain)} className="accent-[var(--color-control)]" />
-                I had pain during or after this session
-              </label>
-              <label className="mt-3 block text-sm">
-                <span className="text-ink-2">Notes (optional)</span>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  maxLength={500}
-                  className={inputClass}
-                />
-              </label>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button type="button" onClick={save} disabled={!difficulty || date > today} className={buttonClass("primary")}>
-                  Mark complete
-                </button>
-                {date > today && <span className="text-xs text-ink-2">You can record this on or after {formatTestDate(date, "short")}, or move it to today.</span>}
-              </div>
-            </div>
-          )}
-
-          {!paused && (
-            <div className="flex flex-wrap items-end gap-2 text-sm">
-              <label className="block">
-                <span className="text-xs text-ink-2">Move within week {session.week}</span>
-                <input
-                  type="date"
-                  value={moveTo}
-                  min={range.from}
-                  max={range.to}
-                  onChange={(e) => setMoveTo(e.target.value)}
-                  className="mt-1 block rounded-lg border border-line-strong bg-canvas px-3 py-1.5 text-sm text-ink"
-                />
-              </label>
-              <button type="button" onClick={move} disabled={moveTo === date} className={buttonClass("secondary", "py-1.5")}>
-                Reschedule
-              </button>
-              <Chip>Completion history is kept</Chip>
-            </div>
-          )}
-        </div>
-      </details>
-    </li>
   );
 }
