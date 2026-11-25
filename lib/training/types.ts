@@ -165,3 +165,112 @@ export type StoredPlan = PlanDraft & {
   reschedules: Record<string, string>;
   reassessmentLink?: ReassessmentLink;
 };
+
+// ---------------------------------------------------------------------------
+// Workout tracking (lib/training/workout.ts)
+// ---------------------------------------------------------------------------
+
+// Which prescription a session uses: weeks 1–2 are foundation; weeks 3–4 are build unless progression is held.
+export type ProgressionPhase = keyof PhasedPrescription;
+
+// What one set, round, hold, or repeat asks for, parsed from the plan's prescription text. Nothing is estimated:
+// text the parser does not recognize becomes "as-prescribed" and keeps the original wording.
+export type WorkoutTarget =
+  | { kind: "reps"; reps: number; upTo?: boolean; secondsEach?: number }
+  | { kind: "rep-range"; min: number; max: number }
+  | { kind: "hold"; seconds: number; upTo?: boolean }
+  | { kind: "hold-range"; minSeconds: number; maxSeconds: number }
+  | { kind: "duration"; seconds: number }
+  | { kind: "interval"; workSeconds: number; recoverySeconds: number; work: string; recovery: string }
+  | { kind: "distance"; meters: number; description: string }
+  | { kind: "as-prescribed"; text: string };
+
+export type WorkoutSetUnit = "set" | "round" | "hold" | "repeat";
+
+export type WorkoutRest = { text: string; minSeconds: number; maxSeconds: number; between: "sets" | "rounds" };
+
+export type WorkoutSet = {
+  id: string; // tracking ID, e.g. "w1-s1/main/mdl-deadlift/deadlift/2"
+  number: number; // 1-based
+  target: WorkoutTarget;
+  instruction?: string; // the library step for this hold, when the drill holds more than one position
+};
+
+export type WorkoutExerciseSource =
+  | { kind: "drill"; drillId: DrillId; exerciseId: string; order: number } // order: 1-based position in the official sequence
+  | { kind: "exercise"; exerciseId: string }
+  | { kind: "activity"; activityId: ActivityId };
+
+export type WorkoutExercise = {
+  id: string;
+  source: WorkoutExerciseSource;
+  name: string;
+  drillName?: string;
+  unit: WorkoutSetUnit;
+  sets: WorkoutSet[];
+  // The prescription for this phase as the plan stores it, for display and review.
+  prescription: Prescription;
+  rest?: WorkoutRest;
+  intensity?: string;
+  cadence?: string;
+  // Library cautions and the prescription's own notes (e.g. using a spotter).
+  safety: string[];
+  // False when any part of the prescription was not recognized; its sets are then "as-prescribed".
+  supported: boolean;
+};
+
+export type ExcludedExercise = {
+  exerciseId: string;
+  name: string;
+  // "plan": the plan itself omits it (restrictions, condensed drill, no sprinting). "restriction" or "equipment":
+  // the plan lists it, but the stored preferences don't allow it, so tracking leaves it out rather than prompt it.
+  // "unknown": the ID is not in the library, so RuckOn cannot check it against restrictions.
+  reason: "plan" | "restriction" | "equipment" | "unknown";
+};
+
+export type WorkoutSection = {
+  id: string;
+  phase: "warm-up" | "main" | "recovery";
+  blockId: string;
+  title: string;
+  minutes: number;
+  exercises: WorkoutExercise[];
+  excluded: ExcludedExercise[];
+  sources: string[];
+  assumptions: string[];
+};
+
+export type WorkoutSnapshot = {
+  schemaVersion: 1;
+  planId: string;
+  sessionId: string;
+  week: number;
+  kind: SessionKind;
+  title: string;
+  templateVersion: string;
+  phase: ProgressionPhase;
+  // True when weeks 3–4 repeat the foundation prescription because an earlier session was too hard or painful.
+  progressionHeld: boolean;
+  estimatedMinutes: number;
+  createdAt: string; // ISO timestamp
+  sections: WorkoutSection[];
+  // Exercises whose prescription was not recognized (by tracking ID), and items left out as unknown.
+  unsupported: { id: string; name: string; text: string }[];
+  safety: string[];
+};
+
+export type ActualPerformance = {
+  reps?: number;
+  seconds?: number;
+  meters?: number;
+  load?: { value: number; unit: "lb" | "kg" };
+};
+
+// One completed set, round, hold, or repeat. Recorded only by the user; never inferred from a session record.
+export type SetCompletion = {
+  planId: string;
+  sessionId: string;
+  setId: string;
+  completedAt: string; // ISO timestamp
+  actual?: ActualPerformance;
+};
