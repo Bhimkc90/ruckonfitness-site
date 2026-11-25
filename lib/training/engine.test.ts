@@ -21,6 +21,7 @@ import {
   rescheduleSession,
   startPlan,
   undoCompletion,
+  undoCompletionBlock,
   activePlan,
 } from "@/lib/storage/trainingPlans";
 import type { BaselineSnapshot, PlanDraft, PlanItem, PlanSession, Preferences, Restriction, Screening } from "./types";
@@ -311,26 +312,32 @@ describe("storage and completion", () => {
     const a = adherence(plan(), data.completions, today);
     expect(a).toMatchObject({ total: 12, completed: 2, scheduledToDate: 4, completedOfScheduled: 2 });
     expect(a.weeks[0]).toEqual({ week: 1, scheduled: 3, completed: 2 });
-    data = undoCompletion(data, "p1", "w1-s1");
+    // Undo works newest first: w1-s1 can't be undone while the later w1-s2 is recorded.
+    expect(undoCompletionBlock(data, "p1", "w1-s1")).toMatch(/already started or completed/);
+    expect(undoCompletion(data, "p1", "w1-s1")).toBe(data);
+    data = undoCompletion(data, "p1", "w1-s2");
     expect(adherence(plan(), data.completions, today).completed).toBe(1);
   });
 
   it("reschedules within the plan week and keeps completion history", () => {
-    data = completeSession(data, { planId: "p1", sessionId: "w1-s3", completedAt: "2026-10-09T18:00:00Z", difficulty: "about-right", pain: false, notes: "" });
-    const moved = rescheduleSession(data, "p1", "w1-s3", "2026-10-10");
+    const now = "2026-10-06T12:00:00Z";
+    const moved = rescheduleSession(data, "p1", "w1-s3", "2026-10-10", now);
     expect(moved.error).toBeUndefined();
     data = moved.data;
     const session = plan().sessions.find((s) => s.id === "w1-s3") as PlanSession;
     expect(sessionDate(plan(), session)).toBe("2026-10-10");
-    expect(data.completions.some((c) => c.sessionId === "w1-s3")).toBe(true);
-    expect(rescheduleSession(data, "p1", "w1-s3", "2026-10-20").error).toMatch(/week 1/);
+    expect(data.completions.some((c) => c.sessionId === "w1-s1")).toBe(true);
+    expect(rescheduleSession(data, "p1", "w1-s3", "2026-10-20", now).error).toMatch(/week 1/);
+    // A completed session keeps its date.
+    expect(rescheduleSession(data, "p1", "w1-s1", "2026-10-06", now).error).toMatch(/keep their date/);
   });
 
   it("refuses to double-book a date and warns about back-to-back hard sessions", () => {
     const monday = plan().sessions.find((s) => s.id === "w1-s1")!; // strength, Monday 2026-10-05
-    expect(rescheduleSession(data, "p1", "w1-s2", sessionDate(plan(), monday)).error).toMatch(/already on that date/);
+    const now = "2026-10-05T08:00:00Z";
+    expect(rescheduleSession(data, "p1", "w1-s2", sessionDate(plan(), monday), now).error).toMatch(/already on that date/);
     const hard = plan().sessions.filter((s) => s.week === 1 && ["strength", "speed", "conditioning"].includes(s.kind));
-    const moved = rescheduleSession(data, "p1", hard[1].id, "2026-10-06");
+    const moved = rescheduleSession(data, "p1", hard[1].id, "2026-10-06", now);
     expect(moved.error).toBeUndefined();
     expect(moved.warning).toMatch(/another hard session/);
   });
@@ -342,11 +349,12 @@ describe("storage and completion", () => {
 
   it("holds progression after a too-hard session or pain", () => {
     expect(progressionHeld(plan(), data.completions, 3)).toBe(false);
-    const hard = completeSession(data, { planId: "p1", sessionId: "w2-s1", completedAt: "2026-10-12T18:00:00Z", difficulty: "too-hard", pain: false, notes: "" });
-    expect(progressionHeld(activePlan(hard)!, hard.completions, 3)).toBe(true);
-    expect(progressionHeld(activePlan(hard)!, hard.completions, 2)).toBe(false);
-    const pain = completeSession(data, { planId: "p1", sessionId: "w2-s2", completedAt: "2026-10-14T18:00:00Z", difficulty: "easy", pain: true, notes: "" });
-    expect(progressionHeld(activePlan(pain)!, pain.completions, 4)).toBe(true);
+    // Records built directly: this checks the progression rule, not the order sessions can be recorded in.
+    const record = (sessionId: string, difficulty: "easy" | "too-hard", pain: boolean) => [...data.completions, { planId: "p1", sessionId, completedAt: "2026-10-12T18:00:00Z", difficulty, pain, notes: "" }];
+    const hard = record("w2-s1", "too-hard", false);
+    expect(progressionHeld(plan(), hard, 3)).toBe(true);
+    expect(progressionHeld(plan(), hard, 2)).toBe(false);
+    expect(progressionHeld(plan(), record("w2-s2", "easy", true), 4)).toBe(true);
   });
 });
 

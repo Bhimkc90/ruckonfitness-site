@@ -456,7 +456,7 @@ describe("tracking IDs", () => {
 
   it("stay the same after rescheduling", () => {
     const data = startPlan(EMPTY_TRAINING, plan, { id: "plan-1", createdAt: CREATED, startDate: START });
-    const moved = rescheduleSession(data, "plan-1", "w1-s1", "2026-10-06");
+    const moved = rescheduleSession(data, "plan-1", "w1-s1", "2026-10-06", "2026-10-05T08:00:00.000Z");
     expect(moved.error).toBeUndefined();
     const session = sessionOf(moved.data.plans[0], "w1-s1");
     expect(moved.data.plans[0].reschedules["w1-s1"]).toBeDefined();

@@ -146,7 +146,7 @@ describe("progress, rescheduling, and reassessment", () => {
   it("warns when a session is moved onto the AFT day", () => {
     const aft = addDays(START, 20); // Sunday of week 3
     const session = started.plans[0].sessions.find((s) => s.week === 3)!;
-    const moved = rescheduleSession(started, "p1", session.id, aft);
+    const moved = rescheduleSession(started, "p1", session.id, aft, "2026-10-05T08:00:00.000Z");
     expect(moved.error).toBeUndefined();
     expect(moved.warning).toMatch(/AFT day/);
   });
@@ -155,7 +155,7 @@ describe("progress, rescheduling, and reassessment", () => {
     const first = started.plans[0].sessions[0];
     let data = completeSession(started, { planId: "p1", sessionId: first.id, completedAt: "2026-10-05T18:00:00.000Z", difficulty: "hard", pain: false, notes: "ok" });
     const second = started.plans[0].sessions[1];
-    data = rescheduleSession(data, "p1", second.id, addDays(START, 6)).data;
+    data = rescheduleSession(data, "p1", second.id, addDays(START, 6), "2026-10-05T20:00:00.000Z").data;
     const today = addDays(START, 3);
     const stats = adherence(activePlan(data)!, data.completions, today);
     expect(stats.completed).toBe(1);

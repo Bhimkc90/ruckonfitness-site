@@ -85,11 +85,12 @@ describe("review path", () => {
 describe("pain pause", () => {
   it("finds the first pain report for the plan and keeps every record", () => {
     const started = startPlan(EMPTY_TRAINING, plan(baseline({}), prefs()), { id: "p1", createdAt: "2026-10-20T12:00:00.000Z", startDate: "2026-10-20" });
-    let data = completeSession(started, { planId: "p1", sessionId: "w1-s1", completedAt: "2026-10-20T18:00:00.000Z", difficulty: "easy", pain: false, notes: "" });
+    // The plan starts on a Tuesday, so week 1 runs Wednesday (w1-s2), Friday (w1-s3), then Monday (w1-s1).
+    let data = completeSession(started, { planId: "p1", sessionId: "w1-s2", completedAt: "2026-10-21T18:00:00.000Z", difficulty: "easy", pain: false, notes: "" });
     expect(firstPainReport(data.plans[0], data.completions)).toBeNull();
-    data = completeSession(data, { planId: "p1", sessionId: "w1-s2", completedAt: "2026-10-22T18:00:00.000Z", difficulty: "hard", pain: true, notes: "knee" });
+    data = completeSession(data, { planId: "p1", sessionId: "w1-s3", completedAt: "2026-10-23T18:00:00.000Z", difficulty: "hard", pain: true, notes: "knee" });
     const withOtherPlan = [...data.completions, { planId: "other", sessionId: "w1-s1", completedAt: "2026-10-19T18:00:00.000Z", difficulty: "easy" as const, pain: true, notes: "" }];
-    expect(firstPainReport(data.plans[0], withOtherPlan)?.sessionId).toBe("w1-s2");
-    expect(data.completions.map((c) => c.sessionId)).toEqual(["w1-s1", "w1-s2"]);
+    expect(firstPainReport(data.plans[0], withOtherPlan)?.sessionId).toBe("w1-s3");
+    expect(data.completions.map((c) => c.sessionId)).toEqual(["w1-s2", "w1-s3"]);
   });
 });

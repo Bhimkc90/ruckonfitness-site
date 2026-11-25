@@ -5,7 +5,7 @@ import { getDrill, getExercise } from "@/lib/library";
 import { WEEKDAYS, addDays, exerciseAllowed, generatePlan } from "./engine";
 import { progressionHeld } from "./progress";
 import { runningLimits } from "./templates";
-import { EMPTY_TRAINING, completeSession, linkReassessment, startPlan } from "@/lib/storage/trainingPlans";
+import { EMPTY_TRAINING, linkReassessment, startPlan } from "@/lib/storage/trainingPlans";
 import type { BaselineSnapshot, EquipmentOption, PlanDraft, Preferences, Restriction, RunningVolume, WeekdayId } from "./types";
 
 // Checks the documented rules (docs/training-plan-review.md) across every schedule and a broad matrix of
@@ -202,8 +202,10 @@ describe("progression gate and reassessment edge cases", () => {
   if (outcome.status !== "ready") throw new Error(outcome.status);
   const started = startPlan(EMPTY_TRAINING, outcome.plan, { id: "p1", createdAt: "2026-10-05T12:00:00.000Z", startDate: "2026-10-05" });
   const plan = started.plans[0];
-  const rate = (sessionId: string, difficulty: "easy" | "about-right" | "hard" | "too-hard", pain = false, planId = "p1") =>
-    completeSession(started, { planId, sessionId, completedAt: "2026-10-06T18:00:00.000Z", difficulty, pain, notes: "" }).completions;
+  // Records built directly: these check the progression rule, not the order sessions can be recorded in.
+  const rate = (sessionId: string, difficulty: "easy" | "about-right" | "hard" | "too-hard", pain = false, planId = "p1") => [
+    { planId, sessionId, completedAt: "2026-10-06T18:00:00.000Z", difficulty, pain, notes: "" },
+  ];
 
   it("progresses after easy, about-right, or hard ratings without pain", () => {
     for (const d of ["easy", "about-right", "hard"] as const) {

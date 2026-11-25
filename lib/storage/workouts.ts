@@ -1,4 +1,5 @@
 import { PAIN_PAUSE_MESSAGE } from "@/lib/training/progress";
+import { ONE_PER_DAY, localDateOf, sessionState } from "@/lib/training/sessionStatus";
 import {
   planPaused,
   recordSetCompletion,
@@ -40,19 +41,24 @@ function locate(data: TrainingData, planId: unknown, sessionId: unknown): Locate
   };
 }
 
-// An open workout that can take set changes: it exists, isn't completed, and the plan isn't ended or paused.
-function openWorkout(data: TrainingData, planId: string, sessionId: string): { found: Located & { workout: StoredWorkout } } | { error: string } {
+// An open workout that can take set changes: it exists, isn't completed, the plan isn't ended or paused, and the
+// session is still in turn (every earlier session completed) with a readable prescription.
+function openWorkout(data: TrainingData, planId: string, sessionId: string, at: string): { found: Located & { workout: StoredWorkout } } | { error: string } {
   const found = locate(data, planId, sessionId);
   if ("error" in found) return found;
   if (planPaused(planId, safetyRecords(data))) return { error: PAIN_PAUSE_MESSAGE };
   if (found.plan.status !== "active") return { error: "This plan has ended." };
   if (!found.workout) return { error: "This workout hasn't been started." };
   if (found.workout.status === "completed" || found.completion) return { error: "This workout is already complete." };
+  if (!localDateOf(at)) return { error: "Time must be an ISO timestamp." };
+  const state = sessionState(found.plan, data, sessionId, at)!;
+  if (state.status !== "in-progress") return { error: state.reasons.join(" ") };
   return { found: found as Located & { workout: StoredWorkout } };
 }
 
 // Starts a workout and stores its frozen snapshot, or continues the stored one. A stored snapshot is never rebuilt:
 // later feedback only produces a notice. Sessions already recorded without tracking get no set records.
+// Eligibility comes from sessionStatus.ts: a locked, upcoming, blocked, paused, or ended session can't start.
 export function startOrResumeWorkout(data: TrainingData, planId: string, sessionId: string, at: string): Result<{ workout: WorkoutSnapshot; resumed: boolean; notice?: string }> {
   const found = locate(data, planId, sessionId);
   if ("error" in found) return fail(found.error);
@@ -60,14 +66,18 @@ export function startOrResumeWorkout(data: TrainingData, planId: string, session
   const safety = safetyRecords(data);
   if (planPaused(planId, safety)) return fail(PAIN_PAUSE_MESSAGE);
   if (found.plan.status !== "active") return fail("This plan has ended.");
+  const state = sessionState(found.plan, data, sessionId, at)!;
   if (found.workout) {
     if (found.workout.status === "completed" || found.completion) return fail("This workout is already complete.");
+    if (state.status !== "in-progress") return fail(state.reasons.join(" "));
     const resumed = resumeWorkout(found.plan, safety, found.workout.snapshot);
     if (resumed.status === "paused") return fail(resumed.message);
     if (resumed.status === "mismatch") return fail(resumed.reason);
     return { ok: true, data, workout: resumed.workout, resumed: true, ...(resumed.notice ? { notice: resumed.notice } : {}) };
   }
   if (found.completion) return fail("This session is already recorded.");
+  // Starting needs the session's turn: earlier sessions completed, its date reached, nothing else trained today.
+  if (!state.eligible) return fail(state.reasons.join(" "));
   const started = startWorkout(found.plan, safety, sessionId, at);
   if (started.status !== "started") return fail(started.status === "paused" ? started.message : "Session not found.");
   const stored: StoredWorkout = { planId, sessionId, status: "in-progress", startedAt: at, snapshot: started.workout };
@@ -80,7 +90,7 @@ export function recordWorkoutSet(
   sessionId: string,
   entry: { setId: string; completedAt: string; actual?: ActualPerformance }
 ): Result {
-  const open = openWorkout(data, planId, sessionId);
+  const open = openWorkout(data, planId, sessionId, entry?.completedAt);
   if ("error" in open) return fail(open.error);
   if (typeof entry?.setId !== "string" || !SET_ID.test(entry.setId)) return fail("Invalid set ID.");
   if (data.setRecords.length >= WORKOUT_LIMITS.setRecords) return fail("RuckOn can't store more recorded sets in this browser.");
@@ -90,8 +100,8 @@ export function recordWorkoutSet(
 }
 
 // Undo is for a set recorded by mistake. It is refused while the plan is paused, so recorded progress is kept.
-export function undoWorkoutSet(data: TrainingData, planId: string, sessionId: string, setId: string): Result {
-  const open = openWorkout(data, planId, sessionId);
+export function undoWorkoutSet(data: TrainingData, planId: string, sessionId: string, setId: string, at: string): Result {
+  const open = openWorkout(data, planId, sessionId, at);
   if ("error" in open) return fail(open.error);
   if (typeof setId !== "string" || !SET_ID.test(setId)) return fail("Invalid set ID.");
   if (!data.setRecords.some((r) => r.planId === planId && r.sessionId === sessionId && r.setId === setId)) return fail("That set isn't recorded.");
@@ -124,13 +134,16 @@ export type WorkoutFeedback = { completedAt: string; difficulty: Difficulty; pai
 // plan needs is given. Blocked (unread prescriptions), incomplete, and paused workouts can't be completed here.
 // Feedback with pain completes the session with pain, which pauses the plan the same way the plan view does.
 export function completeTrackedWorkout(data: TrainingData, planId: string, sessionId: string, feedback: WorkoutFeedback): Result<{ completion: SessionCompletion }> {
-  const open = openWorkout(data, planId, sessionId);
+  const open = openWorkout(data, planId, sessionId, feedback?.completedAt);
   if ("error" in open) return fail(open.error);
   if (!feedback || !DIFFICULTIES.includes(feedback.difficulty)) return fail("Choose how hard the session was.");
   if (typeof feedback.pain !== "boolean") return fail("Answer whether you had pain.");
   if (typeof feedback.notes !== "string") return fail("Notes must be text.");
   const { workout } = open.found;
   if (!isTimestamp(feedback.completedAt) || feedback.completedAt < workout.startedAt) return fail("Completion time must be an ISO timestamp after the workout started.");
+  const day = localDateOf(feedback.completedAt);
+  if (data.completions.some((c) => c.planId === planId && c.sessionId !== sessionId && localDateOf(c.completedAt) === day)) return fail(ONE_PER_DAY);
+  // Every set recorded is not enough on its own: the session completes, and the next one unlocks, only here.
   const readiness = workoutReadiness(workout.snapshot, data.setRecords, safetyRecords(data));
   if (readiness.status === "paused") return fail(readiness.message);
   if (readiness.status === "blocked") return fail(`This workout can't be completed from set records: ${readiness.reasons.join(" ")}`);
@@ -170,9 +183,13 @@ export function trackedWorkout(data: TrainingData, planId: string, sessionId: st
 
 const save = <T extends object>(operation: TrainingOperation<T>) => commitTrainingData(operation);
 
-export const saveStartOrResumeWorkout = (planId: string, sessionId: string, at: string) => save((d) => startOrResumeWorkout(d, planId, sessionId, at));
-export const saveWorkoutSet = (planId: string, sessionId: string, entry: { setId: string; completedAt: string; actual?: ActualPerformance }) =>
-  save((d) => recordWorkoutSet(d, planId, sessionId, entry));
-export const saveUndoWorkoutSet = (planId: string, sessionId: string, setId: string) => save((d) => undoWorkoutSet(d, planId, sessionId, setId));
-export const savePainReport = (planId: string, sessionId: string, entry: { reportedAt: string; setId?: string; notes: string }) => save((d) => reportPain(d, planId, sessionId, entry));
-export const saveTrackedCompletion = (planId: string, sessionId: string, feedback: WorkoutFeedback) => save((d) => completeTrackedWorkout(d, planId, sessionId, feedback));
+// The saving operations read the device clock themselves, so a caller can't pass a later time to unlock a session.
+const clock = () => new Date().toISOString();
+
+export const saveStartOrResumeWorkout = (planId: string, sessionId: string) => save((d) => startOrResumeWorkout(d, planId, sessionId, clock()));
+export const saveWorkoutSet = (planId: string, sessionId: string, entry: { setId: string; actual?: ActualPerformance }) =>
+  save((d) => recordWorkoutSet(d, planId, sessionId, { ...entry, completedAt: clock() }));
+export const saveUndoWorkoutSet = (planId: string, sessionId: string, setId: string) => save((d) => undoWorkoutSet(d, planId, sessionId, setId, clock()));
+export const savePainReport = (planId: string, sessionId: string, entry: { setId?: string; notes: string }) => save((d) => reportPain(d, planId, sessionId, { ...entry, reportedAt: clock() }));
+export const saveTrackedCompletion = (planId: string, sessionId: string, feedback: Omit<WorkoutFeedback, "completedAt">) =>
+  save((d) => completeTrackedWorkout(d, planId, sessionId, { ...feedback, completedAt: clock() }));

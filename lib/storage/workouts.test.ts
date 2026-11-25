@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { scoreAft } from "@/lib/aft/scoring";
 import type { AftInput } from "@/lib/aft/types";
 import { generatePlan } from "@/lib/training/engine";
-import { PAIN_PAUSE_MESSAGE } from "@/lib/training/progress";
-import { buildWorkout, trackableSetIds, UNTRACKABLE_SET_MESSAGE } from "@/lib/training/workout";
+import { PAIN_PAUSE_MESSAGE, sessionsByDate } from "@/lib/training/progress";
+import { buildWorkout, trackableSetIds } from "@/lib/training/workout";
 import type { BaselineSnapshot, Preferences } from "@/lib/training/types";
 import {
   EMPTY_TRAINING,
@@ -60,6 +60,25 @@ function recordAll(data: TrainingData, sessionId = S1, planId = "p1", ids = setI
   return ids.reduce((d, setId) => ok(recordWorkoutSet(d, planId, sessionId, { setId, completedAt: LATER })).data, data);
 }
 const feedback = { completedAt: "2026-10-05T19:00:00.000Z", difficulty: "about-right" as const, pain: false, notes: "" };
+const on = (date: string, hour = 17) => `${date}T${String(hour).padStart(2, "0")}:00:00.000Z`;
+const dateOf = (data: TrainingData, sessionId: string, planId = "p1") => sessionsByDate(data.plans.find((p) => p.id === planId)!).find((d) => d.session.id === sessionId)!.date;
+
+// Records every session before the given one, in order, each on its own date (the plan view's quick record).
+function completeEarlier(data: TrainingData, sessionId: string, planId = "p1"): TrainingData {
+  let d = data;
+  for (const { session, date } of sessionsByDate(data.plans.find((p) => p.id === planId)!)) {
+    if (session.id === sessionId) break;
+    d = completeSession(d, { planId, sessionId: session.id, completedAt: on(date, 18), difficulty: "about-right", pain: false, notes: "" });
+  }
+  return d;
+}
+
+// A stored workout added directly, as a backup or an older version could leave one.
+function withStoredWorkout(data: TrainingData, sessionId: string): TrainingData {
+  const plan = data.plans[0];
+  const snapshot = buildWorkout(plan, plan.sessions.find((s) => s.id === sessionId)!, { phase: "foundation", createdAt: AT });
+  return { ...data, workouts: [...data.workouts, { planId: plan.id, sessionId, status: "in-progress", startedAt: AT, snapshot }] };
+}
 const errorOf = (result: { ok: boolean }) => (result.ok ? "" : (result as unknown as { error: string }).error);
 
 // ---------------------------------------------------------------------------
@@ -164,17 +183,18 @@ describe("starting and resuming", () => {
 
   it("keeps a week 3 build workout after later feedback would hold progression", () => {
     const week3 = strengthId(fresh(), 3);
-    let data = started(fresh(), week3);
+    const ready = completeEarlier(fresh(), week3);
+    let data = ok(startOrResumeWorkout(ready, "p1", week3, on(dateOf(ready, week3)))).data;
     expect(data.workouts[0].snapshot.phase).toBe("build");
     const before = structuredClone(data.workouts[0]);
-    data = completeSession(data, { planId: "p1", sessionId: "w1-s2", completedAt: LATER, difficulty: "too-hard", pain: false, notes: "" });
-    const resumed = ok(startOrResumeWorkout(data, "p1", week3, "2026-10-20T18:00:00.000Z"));
+    // Storage won't take new feedback on an earlier session once a later one has started...
+    expect(completeSession(data, { planId: "p1", sessionId: "w1-s2", completedAt: LATER, difficulty: "too-hard", pain: false, notes: "" })).toBe(data);
+    // ...and feedback that arrives anyway (merged from a backup) doesn't change the started workout.
+    data = { ...data, completions: data.completions.map((c) => (c.sessionId === "w1-s2" ? { ...c, difficulty: "too-hard" as const } : c)) };
+    const resumed = ok(startOrResumeWorkout(data, "p1", week3, on(dateOf(ready, week3), 19)));
     expect(resumed.workout).toEqual(before.snapshot);
     expect(resumed.notice).toMatch(/applies from your next workout/);
     expect(resumed.data.workouts[0]).toEqual(before);
-    // A workout started now uses the held level.
-    const other = strengthId(fresh(), 4);
-    expect(ok(startOrResumeWorkout(data, "p1", other, AT)).workout.phase).toBe("foundation");
   });
 
   it("refuses a stored workout that no longer matches the plan version", () => {
@@ -216,9 +236,9 @@ describe("recording sets", () => {
     data = ok(recordWorkoutSet(data, "p1", S1, { setId: first, completedAt: "2026-10-05T18:01:00.000Z", actual: { reps: 9 } })).data;
     expect(data.setRecords).toHaveLength(1);
     expect(data.setRecords[0].actual).toEqual({ reps: 9 });
-    data = ok(undoWorkoutSet(data, "p1", S1, first)).data;
+    data = ok(undoWorkoutSet(data, "p1", S1, first, LATER)).data;
     expect(data.setRecords).toEqual([]);
-    expect(errorOf(undoWorkoutSet(data, "p1", S1, first))).toBe("That set isn't recorded.");
+    expect(errorOf(undoWorkoutSet(data, "p1", S1, first, LATER))).toBe("That set isn't recorded.");
   });
 
   it("rejects unknown, untrackable, and malformed sets and impossible performance", () => {
@@ -227,29 +247,32 @@ describe("recording sets", () => {
     expect(errorOf(recordWorkoutSet(fresh(), "p1", S1, { setId: first, completedAt: LATER }))).toBe("This workout hasn't been started.");
     expect(errorOf(recordWorkoutSet(data, "p1", S1, { setId: "w1-s1/main/nope/1", completedAt: LATER }))).toBe("That set is not part of this workout.");
     expect(errorOf(recordWorkoutSet(data, "p1", S1, { setId: "<script>", completedAt: LATER }))).toBe("Invalid set ID.");
-    expect(errorOf(recordWorkoutSet(data, "p1", S1, { setId: first, completedAt: "soon" }))).toBe("Completion time must be an ISO timestamp.");
+    expect(errorOf(recordWorkoutSet(data, "p1", S1, { setId: first, completedAt: "soon" }))).toBe("Time must be an ISO timestamp.");
     for (const actual of [{ reps: -1 }, { reps: 1.5 }, { reps: 5000 }, { seconds: 1e9 }, { meters: Infinity }, { load: { value: 2000, unit: "lb" } }, { load: { value: 10, unit: "stone" } }, { speed: 3 }])
       expect(errorOf(recordWorkoutSet(data, "p1", S1, { setId: first, completedAt: LATER, actual: actual as never }))).not.toBe("");
     expect(data.setRecords).toEqual([]);
   });
 
-  it("refuses to record an unread prescription set", () => {
+  it("won't start an unread prescription, or record sets on one that is stored", () => {
     const data = fresh();
     data.plans[0].sessions.find((s) => s.id === S1)!.warmUp[0].items[0].prescription.foundation = { reps: "10 of each" };
-    const withWorkout = started(data);
-    const unread = withWorkout.workouts[0].snapshot.sections[0].exercises[0].sets[0].id;
-    expect(errorOf(recordWorkoutSet(withWorkout, "p1", S1, { setId: unread, completedAt: LATER }))).toBe(UNTRACKABLE_SET_MESSAGE);
+    expect(errorOf(startOrResumeWorkout(data, "p1", S1, AT))).toMatch(/could not read "10 of each"/);
+    expect(data.workouts).toEqual([]);
+    const stored = withStoredWorkout(data, S1);
+    const unread = stored.workouts[0].snapshot.sections[0].exercises[0].sets[0].id;
+    expect(errorOf(recordWorkoutSet(stored, "p1", S1, { setId: unread, completedAt: LATER }))).toMatch(/later workouts stay locked/);
+    expect(errorOf(recordWorkoutSet(stored, "p1", S1, { setId: setIds(stored)[0], completedAt: LATER }))).toMatch(/later workouts stay locked/);
   });
 
   it("keeps plans and sessions separate", () => {
     let data = withPlan(started(), "p2", baseline({ MDL: 120 }, "r2"));
     data = { ...data, plans: data.plans.map((p) => (p.id === "p1" ? { ...p, status: "active" as const } : p)) };
-    const other = "w1-s2";
-    data = started(data, other, "p1");
     data = ok(recordWorkoutSet(data, "p1", S1, { setId: setIds(data)[0], completedAt: LATER })).data;
-    expect(trackedWorkout(data, "p1", other)!.progress.overall.completed).toBe(0);
-    expect(trackedWorkout(data, "p2", S1)).toBeNull();
-    expect(errorOf(recordWorkoutSet(data, "p1", other, { setId: setIds(data)[1], completedAt: LATER }))).toBe("That set is not part of this workout.");
+    data = started(data, S1, "p2");
+    expect(trackedWorkout(data, "p1", S1)!.progress.overall.completed).toBe(1);
+    expect(trackedWorkout(data, "p2", S1)!.progress.overall.completed).toBe(0);
+    expect(trackedWorkout(data, "p1", "w1-s2")).toBeNull();
+    expect(errorOf(recordWorkoutSet(data, "p1", "w1-s2", { setId: setIds(data)[1], completedAt: LATER }))).toBe("This workout hasn't been started.");
   });
 });
 
@@ -264,7 +287,7 @@ describe("completing a tracked workout", () => {
     expect(done.data.workouts[0]).toMatchObject({ status: "completed", completedAt: feedback.completedAt });
     expect(done.data.completions).toContainEqual(done.completion);
     expect(errorOf(recordWorkoutSet(done.data, "p1", S1, { setId: setIds(data)[0], completedAt: LATER }))).toBe("This workout is already complete.");
-    expect(errorOf(undoWorkoutSet(done.data, "p1", S1, setIds(data)[0]))).toBe("This workout is already complete.");
+    expect(errorOf(undoWorkoutSet(done.data, "p1", S1, setIds(data)[0], LATER))).toBe("This workout is already complete.");
     expect(errorOf(startOrResumeWorkout(done.data, "p1", S1, AT))).toBe("This workout is already complete.");
   });
 
@@ -279,9 +302,12 @@ describe("completing a tracked workout", () => {
   it("never completes a workout with an unread prescription", () => {
     const data = fresh();
     data.plans[0].sessions.find((s) => s.id === S1)!.warmUp[0].items[0].prescription.foundation = { reps: "10 of each" };
-    const all = recordAll(started(data));
-    expect(errorOf(completeTrackedWorkout(all, "p1", S1, feedback))).toMatch(/^This workout can't be completed from set records: Bend and Reach/);
+    const stored = withStoredWorkout(data, S1);
+    // Every readable set recorded (as a restored backup could hold them).
+    const all: TrainingData = { ...stored, setRecords: setIds(stored).map((setId) => ({ planId: "p1", sessionId: S1, setId, completedAt: LATER })) };
+    expect(errorOf(completeTrackedWorkout(all, "p1", S1, feedback))).toMatch(/^Bend and Reach: RuckOn could not read/);
     expect(trackedWorkout(all, "p1", S1)!.readiness.status).toBe("blocked");
+    expect(completeSession(all, { planId: "p1", sessionId: S1, ...feedback })).toBe(all);
   });
 
   it("pauses the plan when the feedback reports pain", () => {
@@ -325,7 +351,7 @@ describe("pain during a workout", () => {
     expect(errorOf(startOrResumeWorkout(data, "p1", "w1-s2", AT))).toBe(PAIN_PAUSE_MESSAGE);
     expect(errorOf(startOrResumeWorkout(data, "p1", S1, AT))).toBe(PAIN_PAUSE_MESSAGE);
     expect(errorOf(recordWorkoutSet(data, "p1", S1, { setId: setIds(data)[3], completedAt: LATER }))).toBe(PAIN_PAUSE_MESSAGE);
-    expect(errorOf(undoWorkoutSet(data, "p1", S1, setIds(data)[0]))).toBe(PAIN_PAUSE_MESSAGE);
+    expect(errorOf(undoWorkoutSet(data, "p1", S1, setIds(data)[0], LATER))).toBe(PAIN_PAUSE_MESSAGE);
     expect(errorOf(completeTrackedWorkout(data, "p1", S1, feedback))).toBe(PAIN_PAUSE_MESSAGE);
     expect(rescheduleSession(data, "p1", "w1-s2", "2026-10-08").error).toBe(PAIN_PAUSE_MESSAGE);
     expect(completeSession(data, { planId: "p1", sessionId: "w1-s3", ...feedback })).toBe(data);
@@ -397,22 +423,26 @@ describe("saving to browser storage", () => {
       addEventListener: () => {},
       removeEventListener: () => {},
     };
+    // The saving operations read the clock themselves.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(AT));
   });
   afterEach(() => {
     delete g.window;
+    vi.useRealTimers();
   });
 
   const stored = () => parseTrainingData(store.get(TRAINING_KEY) ?? null);
 
   it("saves each operation as soon as it succeeds, upgrading schema 1 data", () => {
     store.set(TRAINING_KEY, JSON.stringify({ schemaVersion: 1, plans: fresh().plans, completions: [] }));
-    expect(saveStartOrResumeWorkout("p1", S1, AT).ok).toBe(true);
+    expect(saveStartOrResumeWorkout("p1", S1).ok).toBe(true);
     expect(JSON.parse(store.get(TRAINING_KEY)!).schemaVersion).toBe(2);
     expect(stored().workouts).toHaveLength(1);
     const [first] = setIds(stored());
-    expect(saveWorkoutSet("p1", S1, { setId: first, completedAt: LATER }).ok).toBe(true);
+    expect(saveWorkoutSet("p1", S1, { setId: first }).ok).toBe(true);
     expect(stored().setRecords).toHaveLength(1);
-    expect(savePainReport("p1", S1, { reportedAt: LATER, notes: "" }).ok).toBe(true);
+    expect(savePainReport("p1", S1, { notes: "" }).ok).toBe(true);
     expect(stored().painReports).toHaveLength(1);
     expect(stored().plans).toEqual(fresh().plans);
   });
@@ -421,25 +451,25 @@ describe("saving to browser storage", () => {
     store.set(TRAINING_KEY, JSON.stringify(started()));
     const before = store.get(TRAINING_KEY);
     fail = true;
-    const result = saveWorkoutSet("p1", S1, { setId: setIds(started())[0], completedAt: LATER });
+    const result = saveWorkoutSet("p1", S1, { setId: setIds(started())[0] });
     expect(result).toEqual({ ok: false, error: "Could not save on this device. Browser storage may be full or disabled." });
     expect(store.get(TRAINING_KEY)).toBe(before);
     fail = false;
-    expect(saveWorkoutSet("p1", S1, { setId: setIds(started())[0], completedAt: LATER }).ok).toBe(true);
+    expect(saveWorkoutSet("p1", S1, { setId: setIds(started())[0] }).ok).toBe(true);
   });
 
   it("does not save a refused operation", () => {
     store.set(TRAINING_KEY, JSON.stringify(fresh()));
     const before = store.get(TRAINING_KEY);
-    expect(saveWorkoutSet("p1", S1, { setId: "x/1", completedAt: LATER }).ok).toBe(false);
+    expect(saveWorkoutSet("p1", S1, { setId: "x/1" }).ok).toBe(false);
     expect(store.get(TRAINING_KEY)).toBe(before);
   });
 
   it("never overwrites data saved by a newer version", () => {
     const newer = JSON.stringify({ schemaVersion: 3, plans: [], completions: [], future: true });
     store.set(TRAINING_KEY, newer);
-    expect(savePainReport("p1", S1, { reportedAt: LATER, notes: "" }).ok).toBe(false);
-    expect(saveStartOrResumeWorkout("p1", S1, AT).ok).toBe(false);
+    expect(savePainReport("p1", S1, { notes: "" }).ok).toBe(false);
+    expect(saveStartOrResumeWorkout("p1", S1).ok).toBe(false);
     // Creating a plan succeeds on the empty data a newer file reads as, so the write itself must refuse.
     expect(updateTrainingData(() => fresh()).ok).toBe(false);
     expect(store.get(TRAINING_KEY)).toBe(newer);

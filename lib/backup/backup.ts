@@ -5,6 +5,7 @@ import { RAW_LIMITS, isWithin as inRange } from "@/lib/aft/limits";
 import { AFT_RESULTS_SCHEMA_VERSION, findDuplicate, isSavedResult, type SavedAftResult } from "@/lib/storage/aftResults";
 import { LEGACY_TRAINING_SCHEMA_VERSIONS, TRAINING_SCHEMA_VERSION, parseTrainingData, type TrainingData } from "@/lib/storage/trainingPlans";
 import { checkWorkoutData } from "@/lib/storage/workoutRecords";
+import { workoutSetIds } from "@/lib/training/workout";
 import { parseProfile, type SoldierProfile } from "@/lib/profile/profile";
 import { parseSettingsValue, type AppSettings } from "@/lib/settings/settings";
 import type { SessionCompletion, SetCompletion, StoredPlan, StoredWorkout, WorkoutPainReport } from "@/lib/training/types";
@@ -296,11 +297,38 @@ const change = (section: SectionChange["section"], label: string, before: number
 // - Completions: matched by plan and session. They are imported only for plans that were imported or that are
 //   identical in both, so every completion still points at its own plan and baseline.
 // - Profile and app preferences: kept from this browser if present, otherwise taken from the backup.
-// Replace: every section is replaced with the backup's contents (including empty sections).
+// Replace: every section is replaced with the backup's contents (including empty sections), except that pain
+// recorded in this browser for a plan the backup also has is kept as a pain report.
 const LABELS = { workouts: "Started workouts", setRecords: "Recorded sets", painReports: "Pain reports" } as const;
 const same = (a: { planId: string; sessionId: string }, b: { planId: string; sessionId: string }) => a.planId === b.planId && a.sessionId === b.sessionId;
 
-// Replace is the one import that can remove pain records, so it says so for each plan it would un-pause.
+// Pain recorded in this browser for a plan the backup also has. Replacing keeps it as a pain report, so an older
+// backup of the same plan can't lift a pause. A set reference is kept only if the backup's workout has that set.
+function carriedPain(local: LocalData, incoming: LocalData): WorkoutPainReport[] {
+  const t = incoming.training;
+  const sources: WorkoutPainReport[] = [
+    ...local.training.painReports,
+    ...local.training.completions
+      .filter((c) => c.pain && !t.completions.some((x) => canonical(x) === canonical(c)))
+      .map((c) => ({ planId: c.planId, sessionId: c.sessionId, reportedAt: c.completedAt, notes: c.notes })),
+  ];
+  const carried: WorkoutPainReport[] = [];
+  for (const r of sources) {
+    const plan = t.plans.find((p) => p.id === r.planId);
+    if (!plan || !plan.sessions.some((s) => s.id === r.sessionId)) continue;
+    const workout = t.workouts.find((w) => w.planId === r.planId && w.sessionId === r.sessionId);
+    let report = r;
+    if (r.setId !== undefined && !(workout && workoutSetIds(workout.snapshot).includes(r.setId))) {
+      const { setId: _set, ...rest } = r;
+      void _set;
+      report = rest;
+    }
+    if (![...t.painReports, ...carried].some((x) => canonical(x) === canonical(report))) carried.push(report);
+  }
+  return carried;
+}
+
+// Replace can still remove pain for a plan the backup doesn't have at all, so it says so for each such plan.
 function replacedPauses(local: LocalData, next: LocalData): string[] {
   const paused = (data: LocalData) =>
     new Set([...data.training.painReports.map((r) => r.planId), ...data.training.completions.filter((c) => c.pain).map((c) => c.planId)]);
@@ -310,15 +338,17 @@ function replacedPauses(local: LocalData, next: LocalData): string[] {
     .filter((id) => !after.has(id))
     .map((id) => {
       const plan = local.training.plans.find((p) => p.id === id);
-      return `Replacing removes the pain reported for ${plan ? `the plan from ${plan.baseline.testDate}` : "a plan"} in this browser, so that pause is lifted. Talk to a medical provider or your unit's H2F team before training.`;
+      return `Replacing removes the plan from ${plan ? plan.baseline.testDate : "this browser"} and the pain reported for it. Talk to a medical provider or your unit's H2F team before training.`;
     });
 }
 
 export function planImport(local: LocalData, incoming: LocalData, mode: ImportMode, exportedAt: string): ImportPlan {
   const newerLocal = countNewerLocal(local, exportedAt);
 
+  // Replace: every section is the backup's, except that pain recorded here for a plan the backup also has is kept.
   if (mode === "replace") {
-    const next = incoming;
+    const carried = carriedPain(local, incoming);
+    const next: LocalData = carried.length ? { ...incoming, training: { ...incoming.training, painReports: [...incoming.training.painReports, ...carried] } } : incoming;
     const changes = [
       change("aftResults", "AFT results", local.aftResults.length, { after: next.aftResults.length, removed: local.aftResults.length, added: next.aftResults.length }),
       change("plans", "Training plans", local.training.plans.length, { after: next.training.plans.length, removed: local.training.plans.length, added: next.training.plans.length }),
@@ -334,7 +364,12 @@ export function planImport(local: LocalData, incoming: LocalData, mode: ImportMo
         after: next.training.painReports.length,
         removed: local.training.painReports.length,
         added: next.training.painReports.length,
-        notes: replacedPauses(local, next),
+        notes: [
+          ...(carried.length
+            ? [`${carried.length} pain ${carried.length === 1 ? "report" : "reports"} from this browser ${carried.length === 1 ? "is" : "are"} kept, because the backup has the same plan. Restoring a backup can't lift a pain pause.`]
+            : []),
+          ...replacedPauses(local, next),
+        ],
       }),
       change("profile", "Profile", local.profile ? 1 : 0, { after: next.profile ? 1 : 0, removed: local.profile ? 1 : 0, added: next.profile ? 1 : 0 }),
       change("settings", "App preferences", local.settings ? 1 : 0, { after: next.settings ? 1 : 0, removed: local.settings ? 1 : 0, added: next.settings ? 1 : 0 }),

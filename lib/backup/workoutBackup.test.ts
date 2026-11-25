@@ -12,6 +12,8 @@ import { countNewerLocal, createBackup, planImport, serializeBackup, validateBac
 const EXPORTED = "2026-10-06T12:00:00.000Z";
 const AT = "2026-10-05T17:00:00.000Z";
 const LATER = "2026-10-05T18:00:00.000Z";
+const WED = "2026-10-07T17:00:00.000Z"; // w1-s2's date
+const WED_LATER = "2026-10-07T18:00:00.000Z";
 
 function baseline(id: string): BaselineSnapshot {
   const input: AftInput = { age: 25, standard: "general", gender: "M", raw: { MDL: 120, HRP: 40, SDC: 110, PLK: 150, "2MR": 990 } };
@@ -34,21 +36,22 @@ function ok<T extends { ok: boolean }>(r: T): Extract<T, { ok: true }> {
   return r as Extract<T, { ok: true }>;
 }
 const ids = (data: TrainingData, sessionId: string, planId = "p1") => trackableSetIds(data.workouts.find((w) => w.planId === planId && w.sessionId === sessionId)!.snapshot);
-const record = (data: TrainingData, sessionId: string, setIds: string[], planId = "p1") =>
-  setIds.reduce((d, setId) => ok(recordWorkoutSet(d, planId, sessionId, { setId, completedAt: LATER, actual: { reps: 8 } })).data, data);
+const record = (data: TrainingData, sessionId: string, setIds: string[], planId = "p1", at = sessionId === "w1-s1" ? LATER : WED_LATER) =>
+  setIds.reduce((d, setId) => ok(recordWorkoutSet(d, planId, sessionId, { setId, completedAt: at, actual: { reps: 8 } })).data, data);
 const feedback = { completedAt: "2026-10-05T19:00:00.000Z", difficulty: "about-right" as const, pain: false, notes: "" };
 
-// One plan with a completed tracked workout (w1-s1), a half-done workout (w1-s2), and a pain report on w1-s2.
+// One plan with a completed tracked workout (w1-s1, Monday), a half-done workout (w1-s2, Wednesday), and a pain
+// report on w1-s2.
 function training(): TrainingData {
   let data = withPlan(EMPTY_TRAINING, "p1");
   data = ok(startOrResumeWorkout(data, "p1", "w1-s1", AT)).data;
   data = record(data, "w1-s1", ids(data, "w1-s1"));
   data = ok(completeTrackedWorkout(data, "p1", "w1-s1", feedback)).data;
-  data = ok(startOrResumeWorkout(data, "p1", "w1-s2", AT)).data;
+  data = ok(startOrResumeWorkout(data, "p1", "w1-s2", WED)).data;
   data = record(data, "w1-s2", ids(data, "w1-s2").slice(0, 2));
   return data;
 }
-const withPain = (data: TrainingData) => ok(reportPain(data, "p1", "w1-s2", { reportedAt: LATER, setId: ids(data, "w1-s2")[2], notes: "knee" })).data;
+const withPain = (data: TrainingData) => ok(reportPain(data, "p1", "w1-s2", { reportedAt: WED_LATER, setId: ids(data, "w1-s2")[2], notes: "knee" })).data;
 
 const local = (t: TrainingData): LocalData => ({ aftResults: [], training: t, profile: null, settings: null });
 const text = (data: LocalData) => serializeBackup(createBackup(data, { exportedAt: EXPORTED, appVersion: "0.1.0" }));
@@ -191,7 +194,7 @@ describe("merging workouts", () => {
     const theirs = structuredClone(mine);
     // The same session started from the backup's device at another time (a different snapshot).
     const w = theirs.workouts.find((x) => x.sessionId === "w1-s2")!;
-    w.startedAt = w.snapshot.createdAt = "2026-10-05T16:00:00.000Z";
+    w.startedAt = w.snapshot.createdAt = "2026-10-07T16:00:00.000Z";
     const plan = planImport(local(mine), restore(text(local(theirs))), "merge", EXPORTED);
     const workouts = plan.changes.find((c) => c.section === "workouts")!;
     expect(workouts.conflicts).toBe(1);
@@ -205,10 +208,10 @@ describe("merging workouts", () => {
     const mine = training();
     const theirs = structuredClone(mine);
     const w = theirs.workouts.find((x) => x.sessionId === "w1-s2")!;
-    w.startedAt = w.snapshot.createdAt = "2026-10-05T16:00:00.000Z";
+    w.startedAt = w.snapshot.createdAt = "2026-10-07T16:00:00.000Z";
     const theirsWithPain = withPain(theirs);
     const plan = planImport(local(mine), restore(text(local(theirsWithPain))), "merge", EXPORTED);
-    expect(plan.next.training.painReports).toEqual([{ planId: "p1", sessionId: "w1-s2", reportedAt: LATER, notes: "knee" }]);
+    expect(plan.next.training.painReports).toEqual([{ planId: "p1", sessionId: "w1-s2", reportedAt: WED_LATER, notes: "knee" }]);
     expect(plan.changes.find((c) => c.section === "painReports")!.notes.join(" ")).toMatch(/without its set/);
     expect(trackedWorkout(plan.next.training, "p1", "w1-s2")!.readiness.status).toBe("paused");
 
@@ -222,7 +225,9 @@ describe("merging workouts", () => {
   });
 
   it("does not import a workout that conflicts with this browser's session record", () => {
-    const mine = completeSession(withPlan(EMPTY_TRAINING, "p1"), { planId: "p1", sessionId: "w1-s2", ...feedback });
+    // A session record for w1-s2 from before tracking, built directly (older versions recorded in any order).
+    const plain = withPlan(EMPTY_TRAINING, "p1");
+    const mine: TrainingData = { ...plain, completions: [{ planId: "p1", sessionId: "w1-s2", ...feedback }] };
     const theirs = training();
     const plan = planImport(local({ ...mine, completions: [...mine.completions, ...theirs.completions] }), restore(text(local(theirs))), "merge", EXPORTED);
     expect(plan.next.training.workouts.some((w) => w.sessionId === "w1-s2")).toBe(false);
@@ -242,19 +247,47 @@ describe("merging workouts", () => {
 });
 
 describe("replacing with a backup", () => {
-  it("replaces workout records and warns when it lifts a pause", () => {
+  it("can't lift a pause with an older backup of the same plan", () => {
     const mine = withPain(training());
-    const plan = planImport(local(mine), restore(text(local(training()))), "replace", EXPORTED);
+    const older = restore(text(local(training()))); // the same plan, saved before the pain report
+    const plan = planImport(local(mine), older, "replace", EXPORTED);
+    expect(plan.next.training.painReports).toEqual(mine.painReports);
+    expect(trackedWorkout(plan.next.training, "p1", "w1-s2")!.readiness.status).toBe("paused");
+    const pain = plan.changes.find((c) => c.section === "painReports")!;
+    expect(pain).toMatchObject({ before: 1, after: 1 });
+    expect(pain.notes[0]).toMatch(/kept, because the backup has the same plan/);
+    expect(plan.changes.find((c) => c.section === "setRecords")).toMatchObject({ before: mine.setRecords.length, after: mine.setRecords.length });
+    expect(validateBackup(text(plan.next)).ok).toBe(true);
+  });
+
+  it("keeps a painful session record's pain when the backup's copy has none", () => {
+    const painful = completeSession(withPlan(EMPTY_TRAINING, "p1"), { planId: "p1", sessionId: "w1-s1", ...feedback, pain: true, notes: "ankle" });
+    const plan = planImport(local(painful), restore(text(local(withPlan(EMPTY_TRAINING, "p1")))), "replace", EXPORTED);
+    expect(plan.next.training.completions).toEqual([]);
+    expect(plan.next.training.painReports).toEqual([{ planId: "p1", sessionId: "w1-s1", reportedAt: feedback.completedAt, notes: "ankle" }]);
+  });
+
+  it("drops a set reference the backup's workout doesn't have, but keeps the report", () => {
+    const mine = withPain(training());
+    const theirs = withPlan(EMPTY_TRAINING, "p1"); // same plan, no workouts
+    const plan = planImport(local(mine), restore(text(local(theirs))), "replace", EXPORTED);
+    expect(plan.next.training.painReports).toEqual([{ planId: "p1", sessionId: "w1-s2", reportedAt: WED_LATER, notes: "knee" }]);
+    expect(validateBackup(text(plan.next)).ok).toBe(true);
+  });
+
+  it("says so when replacing removes a plan and the pain reported for it", () => {
+    const mine = withPain(training());
+    const plan = planImport(local(mine), restore(text(local(withPlan(EMPTY_TRAINING, "p2")))), "replace", EXPORTED);
     expect(plan.next.training.painReports).toEqual([]);
     const pain = plan.changes.find((c) => c.section === "painReports")!;
     expect(pain).toMatchObject({ before: 1, after: 0, removed: 1 });
-    expect(pain.notes[0]).toMatch(/pause is lifted/);
-    expect(plan.changes.find((c) => c.section === "setRecords")).toMatchObject({ before: mine.setRecords.length, after: mine.setRecords.length });
+    expect(pain.notes[0]).toMatch(/removes the plan from 2026-09-01 and the pain reported for it/);
   });
 
   it("counts workout records saved after the export as newer", () => {
     const data = withPain(training());
-    expect(countNewerLocal(local(data), "2026-10-05T17:30:00.000Z")).toBe(data.setRecords.length + 1 /* pain */ + 1 /* completion */ + 1 /* completed workout */);
+    // Everything after 17:30 on Monday: every set, the pain report, the completion, and both workouts.
+    expect(countNewerLocal(local(data), "2026-10-05T17:30:00.000Z")).toBe(data.setRecords.length + 1 + 1 + 2);
   });
 });
 

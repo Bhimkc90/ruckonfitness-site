@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { addDays, defaultSessionDate, weekWindow } from "@/lib/training/engine";
-import { PAIN_PAUSE_MESSAGE } from "@/lib/training/progress";
+import { PAIN_PAUSE_MESSAGE, sessionsByDate } from "@/lib/training/progress";
+import { laterActivity, localDateOf, sessionState } from "@/lib/training/sessionStatus";
 import { planPaused } from "@/lib/training/workout";
 import type {
   BaselineSnapshot,
@@ -86,14 +87,28 @@ export function endPlan(data: TrainingData, planId: string): TrainingData {
 
 const sameSession = (x: { planId: string; sessionId: string }, planId: string, sessionId: string) => x.planId === planId && x.sessionId === sessionId;
 
-// Why the plan view's quick "record session" can't be used for a session, or null when it can. A paused plan
-// takes no new records; a session with a tracked workout is completed only through that workout's checks.
-export function legacyCompletionBlock(data: TrainingData, planId: string, sessionId: string): string | null {
+// Why the plan view's quick "record session" can't be used for a session at the given time, or null when it can.
+// A paused plan takes no new records; a session with a tracked workout is completed only through that workout's
+// checks; and a new record needs the session to be eligible (in order, on or after its date, one per day). An
+// existing record can be replaced only while nothing later has been started or completed.
+export function legacyCompletionBlock(data: TrainingData, planId: string, sessionId: string, at: string = new Date().toISOString()): string | null {
   const plan = data.plans.find((p) => p.id === planId);
   if (!plan || !plan.sessions.some((s) => s.id === sessionId)) return "Session not found.";
   if (planPaused(planId, safetyRecords(data))) return PAIN_PAUSE_MESSAGE;
   if (data.workouts.some((w) => sameSession(w, planId, sessionId))) return "This session has a tracked workout. Finish it from the workout so every set is checked.";
-  return null;
+  if (!localDateOf(at)) return "Completion time must be an ISO timestamp.";
+  if (data.completions.some((c) => sameSession(c, planId, sessionId))) return laterActivity(plan, data, sessionId);
+  const state = sessionState(plan, data, sessionId, at)!;
+  return state.eligible ? null : state.reasons.join(" ");
+}
+
+// Why a completion can't be undone, or null when it can.
+export function undoCompletionBlock(data: TrainingData, planId: string, sessionId: string): string | null {
+  const plan = data.plans.find((p) => p.id === planId);
+  if (!plan || !plan.sessions.some((s) => s.id === sessionId)) return "Session not found.";
+  if (planPaused(planId, safetyRecords(data))) return PAIN_PAUSE_MESSAGE;
+  if (!data.completions.some((c) => sameSession(c, planId, sessionId))) return "This session isn't recorded.";
+  return laterActivity(plan, data, sessionId);
 }
 
 // Records a session without set tracking (the existing plan view). Blocked as legacyCompletionBlock describes, and
@@ -105,7 +120,7 @@ export function completeSession(
 ): TrainingData {
   const plan = data.plans.find((p) => p.id === entry.planId);
   if (!plan || !plan.sessions.some((s) => s.id === entry.sessionId)) return data;
-  if (legacyCompletionBlock(data, entry.planId, entry.sessionId)) {
+  if (legacyCompletionBlock(data, entry.planId, entry.sessionId, entry.completedAt)) {
     if (!entry.pain) return data;
     const report: WorkoutPainReport = { planId: entry.planId, sessionId: entry.sessionId, reportedAt: entry.completedAt, notes: entry.notes.slice(0, 500) };
     return { ...data, painReports: [...data.painReports, report] };
@@ -114,10 +129,11 @@ export function completeSession(
   return { ...data, completions: [...others, { ...entry, notes: entry.notes.slice(0, 500) }] };
 }
 
-// Undo never lifts a pause: nothing is undone while the plan is paused, so a painful record stays. Undoing a
-// tracked workout's completion reopens the workout with its recorded sets.
+// Undo never lifts a pause: nothing is undone while the plan is paused, so a painful record stays. Nor does it
+// rewrite history: once a later session is started or completed, earlier records stay (undoCompletionBlock says
+// why). Undoing a tracked workout's completion reopens the workout with its recorded sets.
 export function undoCompletion(data: TrainingData, planId: string, sessionId: string): TrainingData {
-  if (planPaused(planId, safetyRecords(data))) return data;
+  if (undoCompletionBlock(data, planId, sessionId)) return data;
   return {
     ...data,
     completions: data.completions.filter((c) => !sameSession(c, planId, sessionId)),
@@ -134,19 +150,33 @@ const HARD_KINDS = new Set(["strength", "speed", "conditioning"]);
 
 // Moves a session within its own plan week. Completion history is keyed by session ID, so it is kept.
 // Two sessions may not share a date; a hard session next to another hard session is allowed with a warning.
+// Completed and started sessions keep their date, a session can't move into the past, and it can't move ahead of
+// anything already completed or started, so moving never reorders history or unlocks a session out of turn.
 export function rescheduleSession(
   data: TrainingData,
   planId: string,
   sessionId: string,
-  date: string
+  date: string,
+  now: string = new Date().toISOString()
 ): { data: TrainingData; error?: string; warning?: string } {
   const plan = data.plans.find((p) => p.id === planId);
   const session = plan?.sessions.find((s) => s.id === sessionId);
   if (!plan || !session) return { data, error: "Session not found." };
   if (planPaused(planId, safetyRecords(data))) return { data, error: PAIN_PAUSE_MESSAGE };
+  if (plan.status !== "active") return { data, error: "This plan has ended." };
+  const doneOrStarted = (id: string) => data.completions.some((c) => sameSession(c, planId, id)) || data.workouts.some((w) => sameSession(w, planId, id));
+  if (doneOrStarted(sessionId)) return { data, error: "Completed and started workouts keep their date, so your history stays in order." };
   const { from, to } = weekWindow(plan.startDate, session.week);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < from || date > to) {
     return { data, error: `Choose a date in week ${session.week} (${from} to ${to}).` };
+  }
+  const today = localDateOf(now);
+  if (!today) return { data, error: "Invalid current time." };
+  if (date < today) return { data, error: "Choose today or a later date. RuckOn doesn't move workouts into the past." };
+  const order = sessionsByDate({ ...plan, reschedules: { ...plan.reschedules, [sessionId]: date } });
+  const position = order.findIndex((d) => d.session.id === sessionId);
+  if (order.slice(position + 1).some((d) => doneOrStarted(d.session.id))) {
+    return { data, error: "That date is before a workout you've already completed or started, which would put your history out of order." };
   }
   const dateOf = (id: string, week: number, weekday: (typeof plan.sessions)[number]["weekday"]) =>
     plan.reschedules[id] ?? defaultSessionDate(plan.startDate, week, weekday);
